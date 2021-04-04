@@ -1,0 +1,38 @@
+group 'sec.hdlt.protos'
+
+
+sourceSets {
+    main.kotlin.srcDirs = main.java.srcDirs = [
+            'build/generated/source/proto/main/java',
+            'build/generated/source/proto/main/grpc',
+            'build/generated/source/proto/main/grpckt',
+            'src/main/proto'
+    ]
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:$protocVersion"
+    }
+
+    plugins {
+        grpc {
+            artifact = "io.grpc:protoc-gen-grpc-java:$grpcVersion"
+        }
+
+        grpckt {
+            artifact = "io.grpc:protoc-gen-grpc-kotlin:$grpcKotlinVersion:jdk7@jar"
+        }
+    }
+
+    generateProtoTasks {
+        ofSourceSet('main')*.plugins {
+            grpckt {}
+            grpc {}
+        }
+    }
+
+    clean {
+        delete generatedFilesBaseDir
+    }
+}

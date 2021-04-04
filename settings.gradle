@@ -1,0 +1,2 @@
+rootProject.name = 'HDLT'
+include 'protos', 'HDLT-CA', 'HDLT-HA', 'HDLT-LocationServer', 'HDLT-MasterServer', 'HDLT-User'

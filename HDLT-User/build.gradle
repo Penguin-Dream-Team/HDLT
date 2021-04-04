@@ -1,0 +1,5 @@
+group 'sec.hdlt.user'
+
+dependencies {
+    implementation project(":protos")
+}

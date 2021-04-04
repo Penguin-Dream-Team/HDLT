@@ -1,0 +1,22 @@
+apply plugin: 'org.openjfx.javafxplugin'
+
+group 'sec.hdlt.master'
+
+javafx {
+    version "15.0.1"
+    modules "javafx.controls", "javafx.base", "javafx.graphics"
+}
+
+application.mainClass = "sec.hdlt.master.MainKt"
+
+sourceSets.main.kotlin.srcDirs = sourceSets.main.java.srcDirs = [
+        '../build/generated/source/proto/main/java',
+        '../build/generated/source/proto/main/grpc',
+        '../build/generated/source/proto/main/grpckt',
+        'src/main/kotlin'
+]
+
+dependencies {
+    implementation "no.tornado:tornadofx:1.7.20"
+    implementation project(":protos")
+}

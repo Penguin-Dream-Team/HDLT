@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package sec.hdlt.protos.server;
+
+option java_package = "sec.hdlt.protos.server";
+
+service Location {
+  rpc LocationReport (ReportRequest) returns (ReportResponse);
+  rpc UserLocationReport (UserLocationReportRequest) returns (UserLocationReportResponse);
+}
+
+message Coordinates {
+  int32 x = 1;
+  int32 y = 2;
+}
+
+message ReportRequest {
+  int32 user1 = 1;
+  int32 user2 = 2;
+  int32 epoch = 3;
+  Coordinates location1 = 4;
+  Coordinates location2 = 5;
+  string sig1 = 6;
+  string sig2 = 7;
+}
+
+message ReportResponse {
+  bool ack = 1;
+}
+
+message UserLocationReportRequest {
+  int32 user = 1;
+  int32 epoch = 2;
+  string sig = 3;
+}
+
+message UserLocationReportResponse {
+  int32 user = 1;
+  int32 epoch = 2;
+  Coordinates location = 3;
+}

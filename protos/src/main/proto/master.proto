@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package sec.hdlt.protos.master;
+
+option java_package = "sec.hdlt.protos.master";
+
+service HDLTMaster {
+  rpc BroadcastEpoch (BroadcastEpochRequest) returns (BroadcastEpochResponse);
+}
+
+message EpochCell {
+  int32 user_id = 1;
+  int32 x = 2;
+  int32 y = 3;
+}
+
+message BroadcastEpochRequest {
+  int32 epoch = 1;
+  repeated EpochCell cells = 2;
+}
+
+message BroadcastEpochResponse {
+  int32 user_id = 1;
+  bool ok = 2;
+}
