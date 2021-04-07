@@ -2,6 +2,7 @@ package sec.hdlt.server.services
 
 import sec.hdlt.server.KEY_ALIAS_PREFIX
 import sec.hdlt.server.data.Coordinates
+import java.security.InvalidKeyException
 import java.security.KeyStore
 import java.security.Signature
 import java.security.SignatureException
@@ -47,6 +48,10 @@ class ReportValidationService(val keyStore: KeyStore) {
             signature1.verify(Base64.getDecoder().decode(sig1)) && signature2.verify(Base64.getDecoder().decode(sig2))
         } catch (e: SignatureException) {
             println("Invalid signature detected")
+            false
+
+        } catch (e: InvalidKeyException) {
+            println("Invalid key detected")
             false
 
         } catch (e: IllegalArgumentException) {
