@@ -38,12 +38,12 @@ class ReportValidationService(val keyStore: KeyStore) {
         return try {
             val signature1: Signature = Signature.getInstance("SHA256withECDSA")
             signature1.initVerify(keyStore.getCertificate(KEY_ALIAS_PREFIX + user1))
-            signature1.update("${user1}${user2}${epoch}${coordinates1}${coordinates2}".toByteArray())
+            signature1.update("${user1}${user2}${epoch}".toByteArray())
             signature1.verify(Base64.getDecoder().decode(sig1))
 
             val signature2: Signature = Signature.getInstance("SHA256withECDSA")
             signature2.initVerify(keyStore.getCertificate(KEY_ALIAS_PREFIX + user2))
-            signature2.update("${user2}${user1}${epoch}${coordinates2}${coordinates1}".toByteArray())
+            signature2.update("${user1}${user2}${epoch}".toByteArray())
             signature2.verify(Base64.getDecoder().decode(sig2))
 
             true

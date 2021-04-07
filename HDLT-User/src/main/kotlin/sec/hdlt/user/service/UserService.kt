@@ -9,7 +9,6 @@ import sec.hdlt.user.BYZ_PROB_NO_VER
 import sec.hdlt.user.BYZ_PROB_PASS_REQ
 import sec.hdlt.user.BYZ_PROB_REJ_REQ
 import sec.hdlt.user.KEY_ALIAS_PREFIX
-import sec.hdlt.user.domain.Coordinates
 import sec.hdlt.user.domain.EpochInfo
 import java.security.Signature
 import java.security.SignatureException
@@ -37,8 +36,6 @@ class UserService(private val info: EpochInfo) : LocationProofGrpcKt.LocationPro
             return stub.requestLocationProof(request)
         }
 
-        val coords = Coordinates(request.location.x, request.location.y)
-
         // Check signature
         var sig: Signature = Signature.getInstance("SHA256withECDSA")
 
@@ -49,7 +46,7 @@ class UserService(private val info: EpochInfo) : LocationProofGrpcKt.LocationPro
 
             try {
                 sig.initVerify(info.keyStore.getCertificate(KEY_ALIAS_PREFIX + request.id))
-                sig.update("${request.id}${request.epoch}$coords".toByteArray())
+                sig.update("${request.id}${request.epoch}".toByteArray())
                 sig.verify(Base64.getDecoder().decode(request.signature))
             } catch (e: SignatureException) {
                 println("INVALID SIGNATURE DETECTED")
@@ -60,7 +57,7 @@ class UserService(private val info: EpochInfo) : LocationProofGrpcKt.LocationPro
             }
 
             // Check if user is near
-            if (!info.position.isNear(coords)) {
+            if (!info.position.isNear(info.board.getUserCoords(request.id))) {
                 println("User not near")
                 throw StatusRuntimeException(Status.FAILED_PRECONDITION)
             } else if (info.epoch != request.epoch) {
@@ -72,17 +69,12 @@ class UserService(private val info: EpochInfo) : LocationProofGrpcKt.LocationPro
         // Send response with new signature
         sig = Signature.getInstance("SHA256withECDSA")
         sig.initSign(info.key)
-        sig.update("${request.id}${info.id}${info.epoch}$coords${info.position}".toByteArray())
+        sig.update("${request.id}${info.id}${info.epoch}".toByteArray())
 
         return User.LocationProofResponse.newBuilder().apply {
             requesterId = request.id
-            requesterLocation = request.location
             epoch = info.epoch
-            responderId = info.id
-            responderLocation = User.Coordinates.newBuilder().apply {
-                x = info.position.x
-                y = info.position.y
-            }.build()
+            proverId = info.id
             signature = try {
                 Base64.getEncoder().encodeToString(sig.sign())
             } catch (e: SignatureException) {

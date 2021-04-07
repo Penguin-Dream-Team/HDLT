@@ -15,13 +15,13 @@ message Coordinates {
 }
 
 message ReportRequest {
-  int32 user1 = 1;
-  int32 user2 = 2;
+  int32 requesterId = 1;
+  int32 proverId = 2;
   int32 epoch = 3;
-  Coordinates location1 = 4;
-  Coordinates location2 = 5;
-  string sig1 = 6;
-  string sig2 = 7;
+  string sig1 = 4;
+  string sig2 = 5;
+  Coordinates requesterLocation = 6;
+  Coordinates proverLocation = 7;
 }
 
 message ReportResponse {

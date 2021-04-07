@@ -4,11 +4,6 @@ package sec.hdlt.protos.user;
 
 option java_package = "sec.hdlt.protos.user";
 
-message Coordinates {
-  int32 x = 1;
-  int32 y = 2;
-}
-
 message Address {
   string host = 1;
   int32 port = 2;
@@ -17,17 +12,14 @@ message Address {
 message LocationProofRequest {
   int32 id = 1;
   int32 epoch = 2;
-  Coordinates location = 3;
   // Base64 encoded
-  string signature = 4;
+  string signature = 3;
 }
 
 message LocationProofResponse {
   int32 requesterId = 1;
-  int32 responderId = 2;
+  int32 proverId = 2;
   int32 epoch = 3;
-  Coordinates requesterLocation = 4;
-  Coordinates responderLocation = 5;
   // Base64 encoded
   string signature = 6;
 }

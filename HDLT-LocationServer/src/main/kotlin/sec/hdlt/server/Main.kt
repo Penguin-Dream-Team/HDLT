@@ -39,17 +39,17 @@ fun main() {
     server.awaitTermination()
 }
 
-class Location(val keystore: KeyStore) : LocationGrpcKt.LocationCoroutineImplBase() {
+class Location(keystore: KeyStore) : LocationGrpcKt.LocationCoroutineImplBase() {
     private val reportsDirectory: String = System.getProperty("user.dir") + "/reports"
     private val locationReportService = LocationReportService(reportsDirectory)
     private val reportValidationService = ReportValidationService(keystore)
 
     override suspend fun locationReport(request: Report.ReportRequest): Report.ReportResponse {
-        val user1 = request.user1
-        val user2 = request.user2
+        val user1 = request.requesterId
+        val user2 = request.proverId
         val epoch = request.epoch
-        val coordinates1 = Coordinates(request.location1.x, request.location1.y)
-        val coordinates2 = Coordinates(request.location2.x, request.location2.y)
+        val coordinates1 = Coordinates(request.requesterLocation.x, request.requesterLocation.y)
+        val coordinates2 = Coordinates(request.requesterLocation.x, request.requesterLocation.y)
         val sig1 = request.sig1
         val sig2 = request.sig2
 

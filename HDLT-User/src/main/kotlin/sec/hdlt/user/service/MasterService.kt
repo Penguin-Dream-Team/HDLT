@@ -27,6 +27,7 @@ class MasterService(private val info: EpochInfo, private val serverChannel: Mana
         println("Receiving epoch ${request.epoch}")
         info.epoch = request.epoch
 
+        // FIXME: Store all boards
         info.board = Board()
 
         // Fill board
@@ -78,14 +79,10 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
         request = User.LocationProofRequest.newBuilder().apply {
             id = info.id
             epoch = info.epoch
-            location = User.Coordinates.newBuilder().apply {
-                x = coords.x
-                y = coords.y
-            }.build()
             signature = try {
                 val sig: Signature = Signature.getInstance("SHA256withECDSA")
                 sig.initSign(info.key)
-                sig.update("${info.id}${info.epoch}$coords".toByteArray())
+                sig.update("${info.id}${info.epoch}".toByteArray())
                 Base64.getEncoder().encodeToString(sig.sign())
             } catch (e: SignatureException) {
                 println("Couldn't sign message")
@@ -109,14 +106,10 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 request = User.LocationProofRequest.newBuilder().apply {
                     id = info.id
                     epoch = info.epoch
-                    location = User.Coordinates.newBuilder().apply {
-                        x = user.coords.x
-                        y = user.coords.y
-                    }.build()
                     signature = try {
                         val sig: Signature = Signature.getInstance("SHA256withECDSA")
                         sig.initSign(info.key)
-                        sig.update("${info.id}${info.epoch}$coords".toByteArray())
+                        sig.update("${info.id}${info.epoch}".toByteArray())
                         Base64.getEncoder().encodeToString(sig.sign())
                     } catch (e: SignatureException) {
                         println("Couldn't sign message")
@@ -152,22 +145,13 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 return@coroutineScope
             }
 
-            val myCoords = Coordinates(response.requesterLocation.x, response.requesterLocation.y)
-            val otherCoords = Coordinates(response.responderLocation.x, response.responderLocation.y)
-
             // Byzantine Level 8: No verification of data
             if (info.byzantineLevel >= 8 && Random.nextInt(100) < BYZ_PROB_NO_VER) {
                 // Skip verification
             } else {
                 // Check response
-                if (user.id != response.responderId || info.id != response.requesterId) {
+                if (user.id != response.proverId || info.id != response.requesterId) {
                     println("User ids do not match")
-                    return@coroutineScope
-                } else if (coords != myCoords) {
-                    println("Location doesn't match")
-                    return@coroutineScope
-                } else if (!coords.isNear(otherCoords)) { // Detect redirection of request by byzantine user
-                    println("User is not near")
                     return@coroutineScope
                 } else if (info.epoch != response.epoch) {
                     println("User is in different epoch")
@@ -178,8 +162,8 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
             // Check signature
             try {
                 val sig: Signature = Signature.getInstance("SHA256withECDSA")
-                sig.initVerify(info.keyStore.getCertificate(KEY_ALIAS_PREFIX + response.responderId))
-                sig.update("${info.id}${response.responderId}${info.epoch}$coords$otherCoords".toByteArray())
+                sig.initVerify(info.keyStore.getCertificate(KEY_ALIAS_PREFIX + user.id))
+                sig.update("${info.id}${user.id}${info.epoch}".toByteArray())
                 sig.verify(Base64.getDecoder().decode(response.signature))
             } catch (e: SignatureException) {
                 println("Invalid signature detected")
@@ -202,22 +186,22 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 println("Tampering with request to server fields")
                 var tampered = false
                 serverRequest = Report.ReportRequest.newBuilder().apply {
-                    user1 = if (!tampered && Random.nextBoolean()) {
+                    proverId = if (!tampered && Random.nextBoolean()) {
                         tampered = true; Random.nextInt(BYZ_MAX_ID_TAMPER)
                     } else {
                         info.id
                     }
-                    user2 = if (!tampered && Random.nextBoolean()) {
+                    requesterId = if (!tampered && Random.nextBoolean()) {
                         tampered = true; Random.nextInt(BYZ_MAX_ID_TAMPER)
                     } else {
-                        response.responderId
+                        response.proverId
                     }
                     epoch = if (!tampered && Random.nextBoolean()) {
                         tampered = true; Random.nextInt(BYZ_MAX_EP_TAMPER)
                     } else {
                         info.epoch
                     }
-                    location1 = Report.Coordinates.newBuilder().apply {
+                    proverLocation = Report.Coordinates.newBuilder().apply {
                         x = if (!tampered && Random.nextBoolean()) {
                             tampered = true; Random.nextInt(BYZ_MAX_COORDS_TAMPER)
                         } else {
@@ -230,16 +214,16 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                         }
                     }.build()
 
-                    location2 = Report.Coordinates.newBuilder().apply {
+                    requesterLocation = Report.Coordinates.newBuilder().apply {
                         x = if (!tampered && Random.nextBoolean()) {
                             tampered = true; Random.nextInt(BYZ_MAX_COORDS_TAMPER)
                         } else {
-                            otherCoords.x
+                            user.coords.x
                         }
                         y = if (tampered && Random.nextBoolean()) {
                             tampered = true; Random.nextInt(BYZ_MAX_COORDS_TAMPER)
                         } else {
-                            otherCoords.y
+                            user.coords.y
                         }
                     }.build()
 
@@ -253,7 +237,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                         try {
                             val sig: Signature = Signature.getInstance("SHA256withECDSA")
                             sig.initSign(info.key)
-                            sig.update("${info.id}${response.responderId}${info.epoch}$coords$otherCoords".toByteArray())
+                            sig.update("${info.id}${user.id}${info.epoch}".toByteArray())
                             Base64.getEncoder().encodeToString(sig.sign())
                         } catch (e: SignatureException) {
                             println("Couldn't sign message")
@@ -274,25 +258,25 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
             } else {
                 // Non-byzantine request
                 serverRequest = Report.ReportRequest.newBuilder().apply {
-                    user1 = info.id
-                    user2 = response.responderId
+                    requesterId = info.id
+                    proverId = response.proverId
 
                     epoch = info.epoch
 
-                    location1 = Report.Coordinates.newBuilder().apply {
+                    requesterLocation = Report.Coordinates.newBuilder().apply {
                         x = coords.x
                         y = coords.y
                     }.build()
 
-                    location2 = Report.Coordinates.newBuilder().apply {
-                        x = otherCoords.x
-                        y = otherCoords.y
+                    proverLocation = Report.Coordinates.newBuilder().apply {
+                        x = user.coords.x
+                        y = user.coords.y
                     }.build()
 
                     sig1 = try {
                         val sig: Signature = Signature.getInstance("SHA256withECDSA")
                         sig.initSign(info.key)
-                        sig.update("${info.id}${response.responderId}${info.epoch}$coords$otherCoords".toByteArray())
+                        sig.update("${info.id}${user.id}${info.epoch}".toByteArray())
                         Base64.getEncoder().encodeToString(sig.sign())
                     } catch (e: SignatureException) {
                         println("Couldn't sign message")
@@ -322,17 +306,17 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
 
         val serverStub = LocationGrpcKt.LocationCoroutineStub(serverChannel)
         if (serverStub.locationReport(Report.ReportRequest.newBuilder().apply {
-                user1 = user.id
-                user2 = info.id
+                requesterId = user.id
+                proverId = info.id
 
                 epoch = info.epoch
 
-                location1 = Report.Coordinates.newBuilder().apply {
+                requesterLocation = Report.Coordinates.newBuilder().apply {
                     x = user.coords.x
                     y = user.coords.y
                 }.build()
 
-                location2 = Report.Coordinates.newBuilder().apply {
+                proverLocation = Report.Coordinates.newBuilder().apply {
                     x = info.position.x
                     y = info.position.y
                 }.build()
@@ -340,7 +324,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 sig1 = try {
                     val sig: Signature = Signature.getInstance("SHA256withECDSA")
                     sig.initSign(info.key)
-                    sig.update("${user.id}${info.id}${info.epoch}${user.coords}${info.position}".toByteArray())
+                    sig.update("${user.id}${info.id}${info.epoch}".toByteArray())
                     Base64.getEncoder().encodeToString(sig.sign())
                 } catch (e: SignatureException) {
                     println("Couldn't sign message")

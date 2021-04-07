@@ -25,6 +25,10 @@ class Board {
         return users
     }
 
+    fun getUserCoords(id: Int): Coordinates {
+        return getUser(id).coords
+    }
+
     fun getNearUsers(ownId: Int, coords: Coordinates): List<UserInfo> {
         return users.stream()
             .filter { it.id != ownId && it.isNear(coords) }
