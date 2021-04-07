@@ -54,6 +54,10 @@ class ReportValidationService(val keyStore: KeyStore) {
             println("Invalid key detected")
             false
 
+        } catch (e: NullPointerException) {
+            println("Invalid key detected")
+            false
+
         } catch (e: IllegalArgumentException) {
             println("Invalid base64 detected")
             false

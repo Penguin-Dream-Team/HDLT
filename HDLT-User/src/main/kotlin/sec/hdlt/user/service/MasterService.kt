@@ -1,9 +1,6 @@
 package sec.hdlt.user.service
 
-import io.grpc.ManagedChannel
-import io.grpc.ManagedChannelBuilder
-import io.grpc.Status
-import io.grpc.StatusRuntimeException
+import io.grpc.*
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -96,10 +93,8 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
     // Launch call for each user
     for (user: UserInfo in users) {
         coroutineScope {
-            val userStub =
-                LocationProofGrpcKt.LocationProofCoroutineStub(
-                    ManagedChannelBuilder.forAddress("localhost", user.port).usePlaintext().build()
-                )
+            val userChannel: ManagedChannel = ManagedChannelBuilder.forAddress("localhost", user.port).usePlaintext().build()
+            val userStub = LocationProofGrpcKt.LocationProofCoroutineStub(userChannel)
 
             // Byzantine Level 4: Fake location, near every user
             if (fakeAll) {
@@ -113,6 +108,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                         Base64.getEncoder().encodeToString(sig.sign())
                     } catch (e: SignatureException) {
                         println("Couldn't sign message")
+                        userChannel.shutdownNow()
                         return@coroutineScope
                     }
                 }.build()
@@ -139,9 +135,30 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                     else -> println("Unknown error")
                 }
 
+                userChannel.shutdownNow()
+                return@coroutineScope
+            } catch (e: StatusException) {
+                when (e.status.code) {
+                    Status.CANCELLED.code -> {
+                        println("Responder detected invalid signature")
+                    }
+                    Status.FAILED_PRECONDITION.code -> {
+                        println("Responder thinks it is far")
+                    }
+                    Status.UNAUTHENTICATED.code -> {
+                        println("Responder couldn't deliver message")
+                    }
+                    Status.INVALID_ARGUMENT.code -> {
+                        println("Responder is in different epoch")
+                    }
+                    else -> println("Unknown error")
+                }
+
+                userChannel.shutdownNow()
                 return@coroutineScope
             } catch (e: Exception) {
                 e.printStackTrace()
+                userChannel.shutdownNow()
                 return@coroutineScope
             }
 
@@ -152,9 +169,11 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 // Check response
                 if (user.id != response.proverId || info.id != response.requesterId) {
                     println("User ids do not match")
+                    userChannel.shutdownNow()
                     return@coroutineScope
                 } else if (info.epoch != response.epoch) {
                     println("User is in different epoch")
+                    userChannel.shutdownNow()
                     return@coroutineScope
                 }
             }
@@ -166,19 +185,23 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 sig.update("${info.id}${user.id}${info.epoch}".toByteArray())
                 if (!sig.verify(Base64.getDecoder().decode(response.signature))) {
                     println("Invalid signature detected")
+                    userChannel.shutdownNow()
                     return@coroutineScope
                 }
             } catch (e: SignatureException) {
                 println("Invalid signature detected")
+                userChannel.shutdownNow()
                 return@coroutineScope
             } catch (e: IllegalArgumentException) {
                 println("Invalid base64 detected")
+                userChannel.shutdownNow()
                 return@coroutineScope
             }
 
             // Byzantine Level 1: No communication with server
             if (info.byzantineLevel >= 1 && Random.nextInt(100) < BYZ_PROB_NOT_SEND) {
                 println("Not communicating location proof to server")
+                userChannel.shutdownNow()
                 return@coroutineScope
             }
 
@@ -244,6 +267,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                             Base64.getEncoder().encodeToString(sig.sign())
                         } catch (e: SignatureException) {
                             println("Couldn't sign message")
+                            userChannel.shutdownNow()
                             return@coroutineScope
                         }
                     }
@@ -283,12 +307,15 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                         Base64.getEncoder().encodeToString(sig.sign())
                     } catch (e: SignatureException) {
                         println("Couldn't sign message")
+                        userChannel.shutdownNow()
                         return@coroutineScope
                     }
 
                     sig2 = response.signature
                 }.build()
             }
+
+            userChannel.shutdownNow()
 
             // Send request to server
             val serverStub = LocationGrpcKt.LocationCoroutineStub(serverChannel)

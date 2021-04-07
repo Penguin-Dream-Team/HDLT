@@ -37,8 +37,8 @@ const val MAX_TIME_COM = 30L // seconds
 // Byzantine options
 const val MIN_BYZ_LEV = -1 // Not byzantine
 const val MAX_BYZ_LEV =  8 // Hardest byzantine
-const val BYZ_PROB_DUMB     = 50 // Probability of forging requests with same signature to server
-const val BYZ_PROB_NOT_SEND = 50 // Probability of not communicating with server
+const val BYZ_PROB_DUMB     = 30 // Probability of forging requests with same signature to server
+const val BYZ_PROB_NOT_SEND = 20 // Probability of not communicating with server
 const val BYZ_PROB_TAMPER   = 45 // Probability of tampering one of the fields in request to server
 const val BYZ_PROB_REJ_REQ  = 45 // Probability of rejecting another user's request
 const val BYZ_PROB_ALL_LOC  = 40 // Probability of stating he is near every user
