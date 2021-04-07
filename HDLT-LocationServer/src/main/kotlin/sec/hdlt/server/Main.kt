@@ -49,7 +49,7 @@ class Location(keystore: KeyStore) : LocationGrpcKt.LocationCoroutineImplBase() 
         val user2 = request.proverId
         val epoch = request.epoch
         val coordinates1 = Coordinates(request.requesterLocation.x, request.requesterLocation.y)
-        val coordinates2 = Coordinates(request.requesterLocation.x, request.requesterLocation.y)
+        val coordinates2 = Coordinates(request.proverLocation.x, request.proverLocation.y)
         val sig1 = request.sig1
         val sig2 = request.sig2
 

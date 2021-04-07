@@ -164,7 +164,10 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 val sig: Signature = Signature.getInstance("SHA256withECDSA")
                 sig.initVerify(info.keyStore.getCertificate(KEY_ALIAS_PREFIX + user.id))
                 sig.update("${info.id}${user.id}${info.epoch}".toByteArray())
-                sig.verify(Base64.getDecoder().decode(response.signature))
+                if (!sig.verify(Base64.getDecoder().decode(response.signature))) {
+                    println("Invalid signature detected")
+                    return@coroutineScope
+                }
             } catch (e: SignatureException) {
                 println("Invalid signature detected")
                 return@coroutineScope

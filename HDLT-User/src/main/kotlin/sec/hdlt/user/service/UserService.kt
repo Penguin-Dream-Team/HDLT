@@ -47,7 +47,10 @@ class UserService(private val info: EpochInfo) : LocationProofGrpcKt.LocationPro
             try {
                 sig.initVerify(info.keyStore.getCertificate(KEY_ALIAS_PREFIX + request.id))
                 sig.update("${request.id}${request.epoch}".toByteArray())
-                sig.verify(Base64.getDecoder().decode(request.signature))
+                if (!sig.verify(Base64.getDecoder().decode(request.signature))) {
+                    println("INVALID SIGNATURE DETECTED")
+                    throw StatusRuntimeException(Status.CANCELLED)
+                }
             } catch (e: SignatureException) {
                 println("INVALID SIGNATURE DETECTED")
                 throw StatusRuntimeException(Status.CANCELLED)

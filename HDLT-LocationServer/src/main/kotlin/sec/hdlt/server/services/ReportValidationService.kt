@@ -16,7 +16,7 @@ class ReportValidationService(val keyStore: KeyStore) {
         coordinates1: Coordinates,
         coordinates2: Coordinates
     ): Boolean {
-        if (!coordinates1.isNear(coordinates2))
+        if (!coordinates1.isNear(coordinates2) || user1 == user2)
             return false
 
         return true
@@ -39,15 +39,12 @@ class ReportValidationService(val keyStore: KeyStore) {
             val signature1: Signature = Signature.getInstance("SHA256withECDSA")
             signature1.initVerify(keyStore.getCertificate(KEY_ALIAS_PREFIX + user1))
             signature1.update("${user1}${user2}${epoch}".toByteArray())
-            signature1.verify(Base64.getDecoder().decode(sig1))
 
             val signature2: Signature = Signature.getInstance("SHA256withECDSA")
             signature2.initVerify(keyStore.getCertificate(KEY_ALIAS_PREFIX + user2))
             signature2.update("${user1}${user2}${epoch}".toByteArray())
-            signature2.verify(Base64.getDecoder().decode(sig2))
 
-            true
-
+            signature1.verify(Base64.getDecoder().decode(sig1)) && signature2.verify(Base64.getDecoder().decode(sig2))
         } catch (e: SignatureException) {
             println("Invalid signature detected")
             false
@@ -68,8 +65,6 @@ class ReportValidationService(val keyStore: KeyStore) {
             signature.initVerify(keyStore.getCertificate(KEY_ALIAS_PREFIX + user))
             signature.update("${user}${epoch}".toByteArray())
             signature.verify(Base64.getDecoder().decode(sig))
-            true
-
         } catch (e: SignatureException) {
             println("Invalid signature detected")
             false
