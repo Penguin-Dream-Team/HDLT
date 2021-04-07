@@ -38,7 +38,7 @@ class MasterService(private val info: EpochInfo, private val serverChannel: Mana
         GlobalScope.launch {
             val userInfo = info.clone()
 
-            delay(Random.nextLong(MIN_TIME_COM, MAX_TIME_COM) * 1000)
+            //delay(Random.nextLong(MIN_TIME_COM, MAX_TIME_COM) * 1000)
 
             communicate(userInfo, serverChannel)
         }
@@ -152,6 +152,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 return@coroutineScope
             }
 
+            val myCoords = Coordinates(response.requesterLocation.x, response.requesterLocation.y)
             val otherCoords = Coordinates(response.responderLocation.x, response.responderLocation.y)
 
             // Byzantine Level 8: No verification of data
@@ -162,7 +163,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 if (user.id != response.responderId || info.id != response.requesterId) {
                     println("User ids do not match")
                     return@coroutineScope
-                } else if (coords != otherCoords) {
+                } else if (coords != myCoords) {
                     println("Location doesn't match")
                     return@coroutineScope
                 } else if (!coords.isNear(otherCoords)) { // Detect redirection of request by byzantine user
@@ -178,8 +179,8 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
             try {
                 val sig: Signature = Signature.getInstance("SHA256withECDSA")
                 sig.initVerify(info.keyStore.getCertificate(KEY_ALIAS_PREFIX + response.responderId))
-                sig.update(Base64.getDecoder().decode(response.signature))
-                sig.verify("${user}${response.responderId}${info.epoch}$coords$otherCoords".toByteArray())
+                sig.update("${info.id}${response.responderId}${info.epoch}$coords$otherCoords".toByteArray())
+                sig.verify(Base64.getDecoder().decode(response.signature))
             } catch (e: SignatureException) {
                 println("Invalid signature detected")
                 return@coroutineScope
@@ -252,7 +253,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                         try {
                             val sig: Signature = Signature.getInstance("SHA256withECDSA")
                             sig.initSign(info.key)
-                            sig.update("${user.id}${response.responderId}${info.epoch}$coords$otherCoords".toByteArray())
+                            sig.update("${info.id}${response.responderId}${info.epoch}$coords$otherCoords".toByteArray())
                             Base64.getEncoder().encodeToString(sig.sign())
                         } catch (e: SignatureException) {
                             println("Couldn't sign message")
@@ -291,7 +292,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                     sig1 = try {
                         val sig: Signature = Signature.getInstance("SHA256withECDSA")
                         sig.initSign(info.key)
-                        sig.update("${user.id}${response.responderId}${info.epoch}$coords$otherCoords".toByteArray())
+                        sig.update("${info.id}${response.responderId}${info.epoch}$coords$otherCoords".toByteArray())
                         Base64.getEncoder().encodeToString(sig.sign())
                     } catch (e: SignatureException) {
                         println("Couldn't sign message")

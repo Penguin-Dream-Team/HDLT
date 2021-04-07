@@ -1,12 +1,14 @@
 package sec.hdlt.server.services
 
+import sec.hdlt.server.KEY_ALIAS_PREFIX
 import sec.hdlt.server.data.Coordinates
+import java.security.KeyStore
 import java.security.Signature
 import java.security.SignatureException
 import java.util.*
 
 @Suppress("NAME_SHADOWING")
-class ReportValidationService() {
+class ReportValidationService(val keyStore: KeyStore) {
 
     fun validateRequest(
         user1: Int,
@@ -34,15 +36,15 @@ class ReportValidationService() {
         sig2: String
     ): Boolean {
         return try {
-            val signature1: Signature = Signature.getInstance("SHA256withRSA")
-            //signature1.initVerify(keyStore.getCertificate(KEY_ALIAS_PREFIX + user1))
-            signature1.update(Base64.getDecoder().decode(sig1))
-            signature1.verify("${user1}${user2}${epoch}${coordinates1}${coordinates2}".toByteArray())
+            val signature1: Signature = Signature.getInstance("SHA256withECDSA")
+            signature1.initVerify(keyStore.getCertificate(KEY_ALIAS_PREFIX + user1))
+            signature1.update("${user1}${user2}${epoch}${coordinates1}${coordinates2}".toByteArray())
+            signature1.verify(Base64.getDecoder().decode(sig1))
 
-            val signature2: Signature = Signature.getInstance("SHA256withRSA")
-            //signature2.initVerify(keyStore.getCertificate(KEY_ALIAS_PREFIX + user2))
-            signature2.update(Base64.getDecoder().decode(sig2))
-            signature2.verify("${user2}${user1}${epoch}${coordinates2}${coordinates1}".toByteArray())
+            val signature2: Signature = Signature.getInstance("SHA256withECDSA")
+            signature2.initVerify(keyStore.getCertificate(KEY_ALIAS_PREFIX + user2))
+            signature2.update("${user2}${user1}${epoch}${coordinates2}${coordinates1}".toByteArray())
+            signature2.verify(Base64.getDecoder().decode(sig2))
 
             true
 
@@ -62,10 +64,10 @@ class ReportValidationService() {
         sig: String
     ): Boolean {
         return try {
-            val signature: Signature = Signature.getInstance("SHA256withRSA")
-            //sig.initVerify(keyStore.getCertificate(KEY_ALIAS_PREFIX + user))
-            signature.update(Base64.getDecoder().decode(sig))
-            signature.verify("${user}${epoch}".toByteArray())
+            val signature: Signature = Signature.getInstance("SHA256withECDSA")
+            signature.initVerify(keyStore.getCertificate(KEY_ALIAS_PREFIX + user))
+            signature.update("${user}${epoch}".toByteArray())
+            signature.verify(Base64.getDecoder().decode(sig))
             true
 
         } catch (e: SignatureException) {

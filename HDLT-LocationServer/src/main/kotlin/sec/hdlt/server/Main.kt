@@ -6,20 +6,43 @@ import sec.hdlt.protos.server.Report
 import sec.hdlt.server.data.Coordinates
 import sec.hdlt.server.services.LocationReportService
 import sec.hdlt.server.services.ReportValidationService
+import java.io.FileInputStream
+import java.io.IOException
+import java.io.InputStream
+import java.security.KeyStore
+import java.security.cert.CertificateException
+
+const val KEY_ALIAS_PREFIX = "cert_hdlt_user_"
+const val KEYSTORE_FILE = "/server.jks"
+const val KEYSTORE_PASS = "KeyStoreServer"
 
 fun main() {
+    // Load the keystore
+    val keyStore = KeyStore.getInstance("jks")
+    val keystoreFile: InputStream = object {}.javaClass.getResourceAsStream(KEYSTORE_FILE)
+
+    try {
+        keyStore.load(keystoreFile, KEYSTORE_PASS.toCharArray())
+    } catch(e: IOException) {
+        println("Couldn't open KeyStore file")
+        return
+    } catch(e: CertificateException) {
+        println("Couldn't load all keys/certificates")
+        return
+    }
+
     val server = ServerBuilder.forPort(7777).apply {
-        addService(Location())
+        addService(Location(keyStore))
     }.build()
 
     server.start()
     server.awaitTermination()
 }
 
-class Location : LocationGrpcKt.LocationCoroutineImplBase() {
+class Location(val keystore: KeyStore) : LocationGrpcKt.LocationCoroutineImplBase() {
     private val reportsDirectory: String = System.getProperty("user.dir") + "/reports"
     private val locationReportService = LocationReportService(reportsDirectory)
-    private val reportValidationService = ReportValidationService()
+    private val reportValidationService = ReportValidationService(keystore)
 
     override suspend fun locationReport(request: Report.ReportRequest): Report.ReportResponse {
         val user1 = request.user1
