@@ -166,7 +166,11 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 // Skip verification
             } else {
                 // Check response
-                if (user.id != response.proverId || info.id != response.requesterId) {
+                if (response.epoch == 0 && response.proverId == 0 && response.requesterId == 0 && response.signature.equals("")) {
+                    println("User rejected location proof")
+                    userChannel.shutdownNow()
+                    return@coroutineScope
+                } else if (user.id != response.proverId || info.id != response.requesterId) {
                     println("User ids do not match")
                     userChannel.shutdownNow()
                     return@coroutineScope
