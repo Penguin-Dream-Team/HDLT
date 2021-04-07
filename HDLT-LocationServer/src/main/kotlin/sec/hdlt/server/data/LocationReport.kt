@@ -1,4 +1,4 @@
-package sec.locationserver.data
+package sec.hdlt.server.data
 
 data class LocationReport(
     val user: Int,

@@ -1,6 +1,6 @@
-package sec.locationserver.services
+package sec.hdlt.server.services
 
-import sec.locationserver.data.Coordinates
+import sec.hdlt.server.data.Coordinates
 import java.security.Signature
 import java.security.SignatureException
 import java.util.*

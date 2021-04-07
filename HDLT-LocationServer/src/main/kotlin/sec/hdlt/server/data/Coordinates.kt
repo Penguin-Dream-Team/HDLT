@@ -1,4 +1,4 @@
-package sec.locationserver.data
+package sec.hdlt.server.data
 
 class Coordinates(val x: Int, val y: Int) {
     fun isNear(other: Coordinates): Boolean {

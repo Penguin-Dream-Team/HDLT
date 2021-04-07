@@ -40,17 +40,16 @@ class UserService(private val info: EpochInfo) : LocationProofGrpcKt.LocationPro
         val coords = Coordinates(request.location.x, request.location.y)
 
         // Check signature
-        var sig: Signature = Signature.getInstance("SHA256withRSA")
+        var sig: Signature = Signature.getInstance("SHA256withECDSA")
 
         // Byzantine Level 8: No verification of data
         if (info.byzantineLevel >= 8 && Random.nextInt(100) < BYZ_PROB_NO_VER) {
             // Skip verification
         }else {
 
-            sig.update("${request.id}${request.epoch}$coords".toByteArray())
-
             try {
                 sig.initVerify(info.keyStore.getCertificate(KEY_ALIAS_PREFIX + request.id))
+                sig.update("${request.id}${request.epoch}$coords".toByteArray())
                 sig.verify(Base64.getDecoder().decode(request.signature))
             } catch (e: SignatureException) {
                 println("INVALID SIGNATURE DETECTED")
@@ -71,7 +70,7 @@ class UserService(private val info: EpochInfo) : LocationProofGrpcKt.LocationPro
         }
 
         // Send response with new signature
-        sig = Signature.getInstance("SHA256withRSA")
+        sig = Signature.getInstance("SHA256withECDSA")
         sig.initSign(info.key)
         sig.update("${request.id}${info.id}${info.epoch}$coords${info.position}".toByteArray())
 

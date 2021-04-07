@@ -24,6 +24,7 @@ import kotlin.random.Random
 class MasterService(private val info: EpochInfo, private val serverChannel: ManagedChannel) :
     HDLTMasterGrpcKt.HDLTMasterCoroutineImplBase() {
     override suspend fun broadcastEpoch(request: Master.BroadcastEpochRequest): Master.BroadcastEpochResponse {
+        println("Receiving epoch ${request.epoch}")
         info.epoch = request.epoch
 
         info.board = Board()
@@ -42,10 +43,11 @@ class MasterService(private val info: EpochInfo, private val serverChannel: Mana
             communicate(userInfo, serverChannel)
         }
 
-        return Master.BroadcastEpochResponse.getDefaultInstance()
+        return Master.BroadcastEpochResponse.newBuilder().apply {
+            userId = info.id
+            ok = true
+        }.build()
     }
-
-
 }
 
 suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
@@ -81,7 +83,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 y = coords.y
             }.build()
             signature = try {
-                val sig: Signature = Signature.getInstance("SHA256withRSA")
+                val sig: Signature = Signature.getInstance("SHA256withECDSA")
                 sig.initSign(info.key)
                 sig.update("${info.id}${info.epoch}$coords".toByteArray())
                 Base64.getEncoder().encodeToString(sig.sign())
@@ -112,7 +114,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                         y = user.coords.y
                     }.build()
                     signature = try {
-                        val sig: Signature = Signature.getInstance("SHA256withRSA")
+                        val sig: Signature = Signature.getInstance("SHA256withECDSA")
                         sig.initSign(info.key)
                         sig.update("${info.id}${info.epoch}$coords".toByteArray())
                         Base64.getEncoder().encodeToString(sig.sign())
@@ -145,6 +147,9 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 }
 
                 return@coroutineScope
+            } catch (e: Exception) {
+                e.printStackTrace()
+                return@coroutineScope
             }
 
             val otherCoords = Coordinates(response.responderLocation.x, response.responderLocation.y)
@@ -171,7 +176,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
 
             // Check signature
             try {
-                val sig: Signature = Signature.getInstance("SHA256withRSA")
+                val sig: Signature = Signature.getInstance("SHA256withECDSA")
                 sig.initVerify(info.keyStore.getCertificate(KEY_ALIAS_PREFIX + response.responderId))
                 sig.update(Base64.getDecoder().decode(response.signature))
                 sig.verify("${user}${response.responderId}${info.epoch}$coords$otherCoords".toByteArray())
@@ -245,7 +250,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                         )
                     } else {
                         try {
-                            val sig: Signature = Signature.getInstance("SHA256withRSA")
+                            val sig: Signature = Signature.getInstance("SHA256withECDSA")
                             sig.initSign(info.key)
                             sig.update("${user.id}${response.responderId}${info.epoch}$coords$otherCoords".toByteArray())
                             Base64.getEncoder().encodeToString(sig.sign())
@@ -284,7 +289,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                     }.build()
 
                     sig1 = try {
-                        val sig: Signature = Signature.getInstance("SHA256withRSA")
+                        val sig: Signature = Signature.getInstance("SHA256withECDSA")
                         sig.initSign(info.key)
                         sig.update("${user.id}${response.responderId}${info.epoch}$coords$otherCoords".toByteArray())
                         Base64.getEncoder().encodeToString(sig.sign())
@@ -332,7 +337,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 }.build()
 
                 sig1 = try {
-                    val sig: Signature = Signature.getInstance("SHA256withRSA")
+                    val sig: Signature = Signature.getInstance("SHA256withECDSA")
                     sig.initSign(info.key)
                     sig.update("${user.id}${info.id}${info.epoch}${user.coords}${info.position}".toByteArray())
                     Base64.getEncoder().encodeToString(sig.sign())

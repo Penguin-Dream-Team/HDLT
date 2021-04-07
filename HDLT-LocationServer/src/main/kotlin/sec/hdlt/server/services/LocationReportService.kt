@@ -1,8 +1,8 @@
-package sec.locationserver.services
+package sec.hdlt.server.services
 
 import org.slf4j.LoggerFactory
-import sec.locationserver.data.Coordinates
-import sec.locationserver.data.LocationReport
+import sec.hdlt.server.data.Coordinates
+import sec.hdlt.server.data.LocationReport
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream

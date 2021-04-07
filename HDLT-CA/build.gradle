@@ -6,3 +6,11 @@ dependencies {
     implementation "org.bouncycastle:bcpkix-jdk15on:1.68"
     implementation project(":protos")
 }
+
+compileKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+
+run {
+    standardInput = System.in
+}

@@ -1,11 +1,11 @@
-package sec.locationserver
+package sec.hdlt.server
 
 import io.grpc.ServerBuilder
-import sec.hdlt.protos.master.LocationGrpcKt
-import sec.hdlt.protos.master.Report
-import sec.locationserver.data.Coordinates
-import sec.locationserver.services.LocationReportService
-import sec.locationserver.services.ReportValidationService
+import sec.hdlt.protos.server.LocationGrpcKt
+import sec.hdlt.protos.server.Report
+import sec.hdlt.server.data.Coordinates
+import sec.hdlt.server.services.LocationReportService
+import sec.hdlt.server.services.ReportValidationService
 
 fun main() {
     val server = ServerBuilder.forPort(7777).apply {

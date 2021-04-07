@@ -11,7 +11,7 @@ import sec.hdlt.master.data.Grid
 class Broadcaster(userCount: Int) {
 
     companion object {
-        private const val BASE_PORT = 8000
+        private const val BASE_PORT = 8100
     }
 
     private val users = mutableMapOf<Int, MasterService>().apply {

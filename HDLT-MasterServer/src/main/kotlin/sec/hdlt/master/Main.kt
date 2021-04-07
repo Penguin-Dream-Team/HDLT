@@ -27,10 +27,11 @@ class MasterService(private val channel: ManagedChannel) : Closeable {
     private val logger = LoggerFactory.getLogger("MasterService")
     private val stub = HDLTMasterGrpcKt.HDLTMasterCoroutineStub(channel)
 
-    suspend fun broadcastEpoch(epoch: Int, cells: Map<Int, GridCell>): Boolean {
+    suspend fun broadcastEpoch(epochh: Int, cells: Map<Int, GridCell>): Boolean {
+        println("Broadcasting epoch ${epochh} with ${cells.size}cells")
         val request = Master.BroadcastEpochRequest.newBuilder().apply {
-            this.epoch = epoch
-            this.cellsBuilderList.addAll(cells.map { (id, cell) ->
+            this.epoch = epochh
+            this.addAllCells(cells.map { (id, cell) ->
                 createEpochCell(id, cell.x, cell.y)
             })
         }
@@ -40,12 +41,12 @@ class MasterService(private val channel: ManagedChannel) : Closeable {
         return response.ok
     }
 
-    private fun createEpochCell(id: Int, x: Int, y: Int): Master.EpochCell.Builder {
+    private fun createEpochCell(id: Int, x: Int, y: Int): Master.EpochCell? {
         return Master.EpochCell.newBuilder().apply {
             this.userId = id
             this.x = x
             this.y = y
-        }
+        }.build()
     }
 
     override fun close() {
