@@ -3,6 +3,8 @@ package sec.hdlt.master
 import io.grpc.ManagedChannel
 import org.slf4j.LoggerFactory
 import sec.hdlt.master.data.grid.GridCell
+import sec.hdlt.protos.server.SetupGrpcKt
+import sec.hdlt.protos.server.Server
 import sec.hdlt.protos.master.HDLTMasterGrpcKt
 import sec.hdlt.protos.master.Master
 import tornadofx.launch
@@ -17,10 +19,29 @@ const val ROW_COUNT = 10
 const val COL_COUNT = 10
 const val USER_COUNT = 10
 const val EPOCH_INTERVAL = 0.5
+const val SERVER_PORT = 7777
 
 fun main() {
     launch<MasterApplication>()
     exitProcess(0)
+}
+
+class SetupService(private val channel: ManagedChannel) : Closeable {
+    private val logger = LoggerFactory.getLogger("SetupService")
+    private val stub = SetupGrpcKt.SetupCoroutineStub(channel)
+
+    suspend fun broadcastEpoch(epochh: Int) {
+        val request = Server.BroadcastEpochRequest.newBuilder().apply {
+            this.epoch = epochh
+        }
+
+        val response = stub.broadcastEpoch(request.build())
+        logger.info("Received ${response.ok} from server")
+    }
+
+    override fun close() {
+        channel.shutdown().awaitTermination(500, TimeUnit.MILLISECONDS)
+    }
 }
 
 class MasterService(private val channel: ManagedChannel) : Closeable {

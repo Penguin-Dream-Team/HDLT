@@ -1,10 +1,15 @@
 package sec.hdlt.master.views
 
+import io.grpc.ManagedChannelBuilder
 import javafx.beans.binding.NumberExpressionBase
 import javafx.scene.control.ButtonBar
 import javafx.util.Duration
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import sec.hdlt.master.*
 import sec.hdlt.master.controllers.SimulatorController
+import sec.hdlt.master.services.Broadcaster
 import sec.hdlt.master.viewmodels.MasterSetupViewModel
 import sec.hdlt.master.viewmodels.doubleOnly
 import sec.hdlt.master.viewmodels.intOnly
@@ -58,6 +63,15 @@ class MasterSetupView : View("MasterView | Setup") {
                         centerOnScreen = true,
                         sizeToScene = true
                     )
+
+                    CoroutineScope(Dispatchers.Default).launch {
+                        SetupService(
+                            ManagedChannelBuilder
+                                .forAddress("localhost", SERVER_PORT)
+                                .usePlaintext()
+                                .build()
+                        ).broadcastEpoch(model.epochInterval.value.toInt())
+                    }
                 }
             }
         }

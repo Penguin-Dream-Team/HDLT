@@ -4,6 +4,10 @@ package sec.hdlt.protos.user;
 
 option java_package = "sec.hdlt.protos.user";
 
+service LocationProof {
+  rpc RequestLocationProof (LocationProofRequest) returns (LocationProofResponse);
+}
+
 message Address {
   string host = 1;
   int32 port = 2;
@@ -22,8 +26,4 @@ message LocationProofResponse {
   int32 epoch = 3;
   // Base64 encoded
   string signature = 6;
-}
-
-service LocationProof {
-  rpc RequestLocationProof (LocationProofRequest) returns (LocationProofResponse);
 }

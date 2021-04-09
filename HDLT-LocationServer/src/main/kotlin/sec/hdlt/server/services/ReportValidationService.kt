@@ -8,31 +8,12 @@ import java.security.Signature
 import java.security.SignatureException
 import java.util.*
 
-@Suppress("NAME_SHADOWING")
-class ReportValidationService(val keyStore: KeyStore) {
-
-    fun validateRequest(
-        user1: Int,
-        user2: Int,
-        coordinates1: Coordinates,
-        coordinates2: Coordinates
-    ): Boolean {
-        if (!coordinates1.isNear(coordinates2) || user1 == user2)
-            return false
-
-        return true
-    }
-
-    fun isByzantine(user: Int): Boolean {
-        return true
-    }
+class ReportValidationService(private val keyStore: KeyStore) {
 
     fun validateSignature(
         user1: Int,
         user2: Int,
         epoch: Int,
-        coordinates1: Coordinates,
-        coordinates2: Coordinates,
         sig1: String,
         sig2: String
     ): Boolean {
@@ -82,5 +63,17 @@ class ReportValidationService(val keyStore: KeyStore) {
             println("Invalid base64 detected")
             false
         }
+    }
+
+    fun validateRequest(
+        user1: Int,
+        user2: Int,
+        coordinates1: Coordinates,
+        coordinates2: Coordinates
+    ): Boolean {
+        if (!coordinates1.isNear(coordinates2) || user1 == user2)
+            return false
+
+        return true
     }
 }

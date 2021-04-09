@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package sec.hdlt.protos.server;
+
+option java_package = "sec.hdlt.protos.server";
+
+service Setup {
+  rpc BroadcastEpoch (BroadcastEpochRequest) returns (BroadcastEpochResponse);
+}
+
+message BroadcastEpochRequest {
+  int32 epoch = 1;
+}
+
+message BroadcastEpochResponse {
+  bool ok = 1;
+}

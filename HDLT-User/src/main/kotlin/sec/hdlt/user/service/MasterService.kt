@@ -3,7 +3,6 @@ package sec.hdlt.user.service
 import io.grpc.*
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import sec.hdlt.protos.master.*
 import sec.hdlt.protos.server.*
