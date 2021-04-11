@@ -23,8 +23,8 @@ class UserService(private val info: EpochInfo) : LocationProofGrpcKt.LocationPro
             return User.LocationProofResponse.getDefaultInstance()
         }
 
-        // Byzantine Level 6: Redirect request to other user
-        if (info.byzantineLevel >= 6 && Random.nextInt(100) < BYZ_PROB_PASS_REQ) {
+        // Byzantine Level 4: Redirect request to other user
+        if (info.byzantineLevel >= 4 && Random.nextInt(100) < BYZ_PROB_PASS_REQ) {
             println("Redirecting request")
 
             val user = info.board.getRandomUser()
@@ -39,11 +39,10 @@ class UserService(private val info: EpochInfo) : LocationProofGrpcKt.LocationPro
         // Check signature
         var sig: Signature = Signature.getInstance("SHA256withECDSA")
 
-        // Byzantine Level 8: No verification of data
-        if (info.byzantineLevel >= 8 && Random.nextInt(100) < BYZ_PROB_NO_VER) {
+        // Byzantine Level 5: No verification of data
+        if (info.byzantineLevel >= 5 && Random.nextInt(100) < BYZ_PROB_NO_VER) {
             // Skip verification
-        }else {
-
+        } else {
             try {
                 sig.initVerify(info.keyStore.getCertificate(KEY_ALIAS_PREFIX + request.id))
                 sig.update("${request.id}${request.epoch}".toByteArray())
@@ -61,7 +60,7 @@ class UserService(private val info: EpochInfo) : LocationProofGrpcKt.LocationPro
 
             // Check if user is near
             if (!info.position.isNear(info.board.getUserCoords(request.id))) {
-                println("User not near")
+                //println("User not near")
                 throw StatusRuntimeException(Status.FAILED_PRECONDITION)
             } else if (info.epoch != request.epoch) {
                 println("Wrong epoch")

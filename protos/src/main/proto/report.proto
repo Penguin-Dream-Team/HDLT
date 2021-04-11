@@ -14,14 +14,19 @@ message Coordinates {
   int32 y = 2;
 }
 
-message ReportRequest {
+message LocationProof {
   int32 requesterId = 1;
   int32 proverId = 2;
   int32 epoch = 3;
-  string sig1 = 4;
-  string sig2 = 5;
-  Coordinates requesterLocation = 6;
-  Coordinates proverLocation = 7;
+  string signature = 4; // Base64-encoded
+}
+
+message ReportRequest {
+  int32 id = 1;
+  int32 epoch = 2;
+  Coordinates location = 3;
+  string signature = 4; // Base64-encoded
+  repeated LocationProof proofs = 5;
 }
 
 message ReportResponse {

@@ -31,22 +31,20 @@ const val PBKDF2_KEY_SIZE = 512
 const val PBKDF2_ITER = 100001
 
 // Communication relative params
-const val MIN_TIME_COM = 5L // seconds
+const val MIN_TIME_COM = 0L // seconds
 const val MAX_TIME_COM = 30L // seconds
 
 // Byzantine options
 const val MIN_BYZ_LEV = -1 // Not byzantine
-const val MAX_BYZ_LEV =  8 // Hardest byzantine
+const val MAX_BYZ_LEV =  5 // Hardest byzantine
 const val BYZ_PROB_DUMB     = 30 // Probability of forging requests with same signature to server
-const val BYZ_PROB_NOT_SEND = 20 // Probability of not communicating with server
+const val BYZ_PROB_NOT_SEND = 20 // Probability of not communicating with near (and server consequently)
 const val BYZ_PROB_TAMPER   = 45 // Probability of tampering one of the fields in request to server
 const val BYZ_PROB_REJ_REQ  = 45 // Probability of rejecting another user's request
-const val BYZ_PROB_ALL_LOC  = 40 // Probability of stating he is near every user
-const val BYZ_PROB_SKIP_COM = 35 // Probability of not requesting location proof to near users
 const val BYZ_PROB_PASS_REQ = 35 // Probability of redirecting request to other user
-const val BYZ_PROB_FAKE_LOC = 50 // Probability of faking location for this epoch
 const val BYZ_PROB_NO_VER   = 50 // Probability of not verifying information
 
+const val BYZ_MAX_TIMES_TAMPER  = 5
 const val BYZ_MAX_ID_TAMPER     = 100
 const val BYZ_MAX_EP_TAMPER     = 100
 const val BYZ_MAX_COORDS_TAMPER = 100

@@ -8,22 +8,15 @@ service LocationProof {
   rpc RequestLocationProof (LocationProofRequest) returns (LocationProofResponse);
 }
 
-message Address {
-  string host = 1;
-  int32 port = 2;
-}
-
 message LocationProofRequest {
   int32 id = 1;
   int32 epoch = 2;
-  // Base64 encoded
-  string signature = 3;
+  string signature = 3; // Base64-encoded
 }
 
 message LocationProofResponse {
   int32 requesterId = 1;
   int32 proverId = 2;
   int32 epoch = 3;
-  // Base64 encoded
-  string signature = 6;
+  string signature = 4; // Base64-encoded
 }

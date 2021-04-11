@@ -4,18 +4,18 @@ import io.grpc.*
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import sec.hdlt.protos.master.*
 import sec.hdlt.protos.server.*
 import sec.hdlt.protos.user.*
 import sec.hdlt.user.*
-import sec.hdlt.user.domain.Board
-import sec.hdlt.user.domain.Coordinates
-import sec.hdlt.user.domain.EpochInfo
-import sec.hdlt.user.domain.UserInfo
+import sec.hdlt.user.domain.*
 import java.security.Signature
 import java.security.SignatureException
 import java.util.*
 import kotlin.random.Random
+import kotlin.streams.toList
 
 class MasterService(private val info: EpochInfo, private val serverChannel: ManagedChannel) :
     HDLTMasterGrpcKt.HDLTMasterCoroutineImplBase() {
@@ -35,6 +35,7 @@ class MasterService(private val info: EpochInfo, private val serverChannel: Mana
         GlobalScope.launch {
             val userInfo = info.clone()
 
+            // FIXME: activate this
             //delay(Random.nextLong(MIN_TIME_COM, MAX_TIME_COM) * 1000)
 
             communicate(userInfo, serverChannel)
@@ -48,34 +49,31 @@ class MasterService(private val info: EpochInfo, private val serverChannel: Mana
 }
 
 suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
-    // Byzantine Level 5: Skip communication
-    if (info.byzantineLevel >= 5 && Random.nextInt(100) < BYZ_PROB_SKIP_COM) {
+    // Byzantine Level 1: Skip communication
+    if (info.byzantineLevel >= 1 && Random.nextInt(100) < BYZ_PROB_NOT_SEND) {
         return
     }
 
-    var coords = info.position
+    val users: List<UserInfo> = info.board.getAllUsers()
 
-    var request: User.LocationProofRequest = User.LocationProofRequest.getDefaultInstance()
-
-    val fakeAll: Boolean = info.byzantineLevel >= 4 && Random.nextInt(100) < BYZ_PROB_ALL_LOC
-
-    // Byzantine Level 4: Fake location, near every user
-    val users: List<UserInfo> = if (fakeAll) {
-        println("Faking location, near every user")
-
-        info.board.getAllUsers()
-    } else {
-        // Byzantine Level 7: Fake location for this epoch
-        if (info.byzantineLevel >= 7 && Random.nextInt(100) < BYZ_PROB_FAKE_LOC) {
-            println("Faking location of this epoch")
-            coords = Coordinates(Random.nextInt(100), Random.nextInt(100))
+    // Byzantine Level 2: Tamper with fields
+    // Create request once (will be equal for all gRPC calls)
+    val request = User.LocationProofRequest.newBuilder().apply {
+        id = if(info.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
+            Random.nextInt(BYZ_MAX_ID_TAMPER)
+        } else {
+            info.id
+        }
+        epoch = if (info.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
+            Random.nextInt(BYZ_MAX_EP_TAMPER)
+        } else {
+            info.epoch
         }
 
-        // Create request once (will be equal for all gRPC calls)
-        request = User.LocationProofRequest.newBuilder().apply {
-            id = info.id
-            epoch = info.epoch
-            signature = try {
+        signature = if (info.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
+           Base64.getEncoder().encodeToString(Random.nextBytes(BYZ_BYTES_TAMPER))
+        } else {
+            try {
                 val sig: Signature = Signature.getInstance("SHA256withECDSA")
                 sig.initSign(info.key)
                 sig.update("${info.id}${info.epoch}".toByteArray())
@@ -84,251 +82,248 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 println("Couldn't sign message")
                 return
             }
-        }.build()
+        }
+    }.build()
 
-        info.board.getNearUsers(info.id, info.position)
-    }
+    val mutex = Mutex()
+    val responses = mutableListOf<Proof>()
 
     // Launch call for each user
-    for (user: UserInfo in users) {
-        coroutineScope {
-            val userChannel: ManagedChannel = ManagedChannelBuilder.forAddress("localhost", user.port).usePlaintext().build()
-            val userStub = LocationProofGrpcKt.LocationProofCoroutineStub(userChannel)
+    coroutineScope {
+        for (user: UserInfo in users) {
+            launch {
+                val userChannel: ManagedChannel =
+                    ManagedChannelBuilder.forAddress("localhost", user.port).usePlaintext().build()
+                val userStub = LocationProofGrpcKt.LocationProofCoroutineStub(userChannel)
 
-            // Byzantine Level 4: Fake location, near every user
-            if (fakeAll) {
-                request = User.LocationProofRequest.newBuilder().apply {
-                    id = info.id
-                    epoch = info.epoch
-                    signature = try {
-                        val sig: Signature = Signature.getInstance("SHA256withECDSA")
-                        sig.initSign(info.key)
-                        sig.update("${info.id}${info.epoch}".toByteArray())
-                        Base64.getEncoder().encodeToString(sig.sign())
-                    } catch (e: SignatureException) {
-                        println("Couldn't sign message")
-                        userChannel.shutdownNow()
-                        return@coroutineScope
-                    }
-                }.build()
-            }
+                val response: User.LocationProofResponse
 
-            val response: User.LocationProofResponse
+                try {
+                    response = userStub.requestLocationProof(request)
+                    userChannel.shutdownNow()
+                } catch (e: StatusRuntimeException) {
+                    when (e.status.code) {
+                        Status.CANCELLED.code -> {
+                            println("Responder detected invalid signature")
+                        }
+                        Status.FAILED_PRECONDITION.code -> {
+                            //println("Responder thinks it is far")
+                        }
+                        Status.UNAUTHENTICATED.code -> {
+                            println("Responder couldn't deliver message")
+                        }
+                        Status.INVALID_ARGUMENT.code -> {
+                            println("Responder is in different epoch")
+                        }
+                        else -> println("Unknown error")
+                    }
 
-            try {
-                response = userStub.requestLocationProof(request)
-            } catch (e: StatusRuntimeException) {
-                when (e.status.code) {
-                    Status.CANCELLED.code -> {
-                        println("Responder detected invalid signature")
+                    userChannel.shutdownNow()
+                    return@launch
+                } catch (e: StatusException) {
+                    when (e.status.code) {
+                        Status.CANCELLED.code -> {
+                            println("Responder detected invalid signature")
+                        }
+                        Status.FAILED_PRECONDITION.code -> {
+                            //println("Responder thinks it is far")
+                        }
+                        Status.UNAUTHENTICATED.code -> {
+                            println("Responder couldn't deliver message")
+                        }
+                        Status.INVALID_ARGUMENT.code -> {
+                            println("Responder is in different epoch")
+                        }
+                        else -> println("Unknown error")
                     }
-                    Status.FAILED_PRECONDITION.code -> {
-                        println("Responder thinks it is far")
-                    }
-                    Status.UNAUTHENTICATED.code -> {
-                        println("Responder couldn't deliver message")
-                    }
-                    Status.INVALID_ARGUMENT.code -> {
-                        println("Responder is in different epoch")
-                    }
-                    else -> println("Unknown error")
+
+                    userChannel.shutdownNow()
+                    return@launch
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    userChannel.shutdownNow()
+                    return@launch
                 }
 
-                userChannel.shutdownNow()
-                return@coroutineScope
-            } catch (e: StatusException) {
-                when (e.status.code) {
-                    Status.CANCELLED.code -> {
-                        println("Responder detected invalid signature")
-                    }
-                    Status.FAILED_PRECONDITION.code -> {
-                        println("Responder thinks it is far")
-                    }
-                    Status.UNAUTHENTICATED.code -> {
-                        println("Responder couldn't deliver message")
-                    }
-                    Status.INVALID_ARGUMENT.code -> {
-                        println("Responder is in different epoch")
-                    }
-                    else -> println("Unknown error")
-                }
-
-                userChannel.shutdownNow()
-                return@coroutineScope
-            } catch (e: Exception) {
-                e.printStackTrace()
-                userChannel.shutdownNow()
-                return@coroutineScope
-            }
-
-            // Byzantine Level 8: No verification of data
-            if (info.byzantineLevel >= 8 && Random.nextInt(100) < BYZ_PROB_NO_VER) {
-                // Skip verification
-            } else {
-                // Check response
-                if (response.epoch == 0 && response.proverId == 0 && response.requesterId == 0 && response.signature.equals("")) {
-                    println("User rejected location proof")
-                    userChannel.shutdownNow()
-                    return@coroutineScope
-                } else if (user.id != response.proverId || info.id != response.requesterId) {
-                    println("User ids do not match")
-                    userChannel.shutdownNow()
-                    return@coroutineScope
-                } else if (info.epoch != response.epoch) {
-                    println("User is in different epoch")
-                    userChannel.shutdownNow()
-                    return@coroutineScope
-                }
-            }
-
-            // Check signature
-            try {
-                val sig: Signature = Signature.getInstance("SHA256withECDSA")
-                sig.initVerify(info.keyStore.getCertificate(KEY_ALIAS_PREFIX + user.id))
-                sig.update("${info.id}${user.id}${info.epoch}".toByteArray())
-                if (!sig.verify(Base64.getDecoder().decode(response.signature))) {
-                    println("Invalid signature detected")
-                    userChannel.shutdownNow()
-                    return@coroutineScope
-                }
-            } catch (e: SignatureException) {
-                println("Invalid signature detected")
-                userChannel.shutdownNow()
-                return@coroutineScope
-            } catch (e: IllegalArgumentException) {
-                println("Invalid base64 detected")
-                userChannel.shutdownNow()
-                return@coroutineScope
-            }
-
-            // Byzantine Level 1: No communication with server
-            if (info.byzantineLevel >= 1 && Random.nextInt(100) < BYZ_PROB_NOT_SEND) {
-                println("Not communicating location proof to server")
-                userChannel.shutdownNow()
-                return@coroutineScope
-            }
-
-            val serverRequest: Report.ReportRequest
-
-            // Byzantine Level 2: Tamper with fields
-            if (info.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
-                println("Tampering with request to server fields")
-                var tampered = false
-                serverRequest = Report.ReportRequest.newBuilder().apply {
-                    proverId = if (!tampered && Random.nextBoolean()) {
-                        tampered = true; Random.nextInt(BYZ_MAX_ID_TAMPER)
-                    } else {
-                        info.id
-                    }
-                    requesterId = if (!tampered && Random.nextBoolean()) {
-                        tampered = true; Random.nextInt(BYZ_MAX_ID_TAMPER)
-                    } else {
-                        response.proverId
-                    }
-                    epoch = if (!tampered && Random.nextBoolean()) {
-                        tampered = true; Random.nextInt(BYZ_MAX_EP_TAMPER)
-                    } else {
-                        info.epoch
-                    }
-                    proverLocation = Report.Coordinates.newBuilder().apply {
-                        x = if (!tampered && Random.nextBoolean()) {
-                            tampered = true; Random.nextInt(BYZ_MAX_COORDS_TAMPER)
-                        } else {
-                            coords.x
-                        }
-                        y = if (tampered && Random.nextBoolean()) {
-                            tampered = true; Random.nextInt(BYZ_MAX_COORDS_TAMPER)
-                        } else {
-                            coords.y
-                        }
-                    }.build()
-
-                    requesterLocation = Report.Coordinates.newBuilder().apply {
-                        x = if (!tampered && Random.nextBoolean()) {
-                            tampered = true; Random.nextInt(BYZ_MAX_COORDS_TAMPER)
-                        } else {
-                            user.coords.x
-                        }
-                        y = if (tampered && Random.nextBoolean()) {
-                            tampered = true; Random.nextInt(BYZ_MAX_COORDS_TAMPER)
-                        } else {
-                            user.coords.y
-                        }
-                    }.build()
-
-                    sig1 = if (!tampered && Random.nextBoolean()) {
-                        tampered = true; Base64.getEncoder().encodeToString(
-                            Random.nextBytes(
-                                BYZ_BYTES_TAMPER
-                            )
+                // Byzantine Level 5: No verification of data
+                if (info.byzantineLevel >= 5 && Random.nextInt(100) < BYZ_PROB_NO_VER) {
+                    // Skip verifications
+                } else {
+                    // Check response
+                    if (response.epoch == 0 && response.proverId == 0 && response.requesterId == 0 && response.signature.equals(
+                            ""
                         )
-                    } else {
-                        try {
-                            val sig: Signature = Signature.getInstance("SHA256withECDSA")
-                            sig.initSign(info.key)
-                            sig.update("${info.id}${user.id}${info.epoch}".toByteArray())
-                            Base64.getEncoder().encodeToString(sig.sign())
-                        } catch (e: SignatureException) {
-                            println("Couldn't sign message")
-                            userChannel.shutdownNow()
-                            return@coroutineScope
-                        }
+                    ) {
+                        return@launch
+                    } else if (user.id != response.proverId || info.id != response.requesterId) {
+                        println("User ids do not match")
+                        return@launch
+                    } else if (info.epoch != response.epoch) {
+                        println("User is in different epoch")
+                        return@launch
+                    } else if (!info.position.isNear(info.board.getUserCoords(user.id))) {
+                        println("User is far")
+                        return@launch
                     }
 
-                    sig2 = if (!tampered && Random.nextBoolean()) {
-                        tampered = true; Base64.getEncoder().encodeToString(
-                            Random.nextBytes(
-                                BYZ_BYTES_TAMPER
-                            )
-                        )
-                    } else {
-                        response.signature
-                    }
-                }.build()
-            } else {
-                // Non-byzantine request
-                serverRequest = Report.ReportRequest.newBuilder().apply {
-                    requesterId = info.id
-                    proverId = response.proverId
-
-                    epoch = info.epoch
-
-                    requesterLocation = Report.Coordinates.newBuilder().apply {
-                        x = coords.x
-                        y = coords.y
-                    }.build()
-
-                    proverLocation = Report.Coordinates.newBuilder().apply {
-                        x = user.coords.x
-                        y = user.coords.y
-                    }.build()
-
-                    sig1 = try {
+                    // Check signature
+                    try {
                         val sig: Signature = Signature.getInstance("SHA256withECDSA")
-                        sig.initSign(info.key)
+                        sig.initVerify(info.keyStore.getCertificate(KEY_ALIAS_PREFIX + user.id))
                         sig.update("${info.id}${user.id}${info.epoch}".toByteArray())
-                        Base64.getEncoder().encodeToString(sig.sign())
+                        if (!sig.verify(Base64.getDecoder().decode(response.signature))) {
+                            println("Invalid signature detected")
+                            userChannel.shutdownNow()
+                            return@launch
+                        }
                     } catch (e: SignatureException) {
-                        println("Couldn't sign message")
-                        userChannel.shutdownNow()
-                        return@coroutineScope
+                        println("Invalid signature detected")
+                        return@launch
+                    } catch (e: IllegalArgumentException) {
+                        println("Invalid base64 detected")
+                        return@launch
                     }
 
-                    sig2 = response.signature
-                }.build()
-            }
+                    mutex.withLock {
+                        responses.add(
+                            Proof(
+                                response.requesterId,
+                                response.proverId,
+                                response.epoch,
+                                response.signature
+                            )
+                        )
+                    }
+                }
+            } // launch coroutine
+        } // for loop
+    } // Coroutine scope
 
-            userChannel.shutdownNow()
-
-            // Send request to server
-            val serverStub = LocationGrpcKt.LocationCoroutineStub(serverChannel)
-
-            if (serverStub.locationReport(serverRequest).ack) {
-                println("Request was OK")
+    // Byzantine Level 2: Tamper with fields
+    val serverRequest: Report.ReportRequest = if (info.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
+        println("Tampering with request to server fields")
+        var tampered = BYZ_MAX_TIMES_TAMPER
+        Report.ReportRequest.newBuilder().apply {
+            id = if (tampered > 0 && Random.nextBoolean()) {
+                tampered--
+                Random.nextInt(BYZ_MAX_ID_TAMPER)
             } else {
-                println("BUSTED")
+                info.id
             }
-        }
+
+            epoch = if (tampered > 0 && Random.nextBoolean()) {
+                tampered--
+                Random.nextInt(BYZ_MAX_EP_TAMPER)
+            } else {
+                info.epoch
+            }
+
+            location = Report.Coordinates.newBuilder().apply {
+                x = if (tampered > 0 && Random.nextBoolean()) {
+                    tampered--
+                    Random.nextInt(BYZ_MAX_COORDS_TAMPER)
+                } else {
+                    info.position.x
+                }
+                y = if (tampered > 0 && Random.nextBoolean()) {
+                    Random.nextInt(BYZ_MAX_COORDS_TAMPER)
+                } else {
+                    info.position.y
+                }
+            }.build()
+
+            signature = if (tampered > 0 && Random.nextBoolean()) {
+                tampered--
+                Base64.getEncoder().encodeToString(
+                    Random.nextBytes(
+                        BYZ_BYTES_TAMPER
+                    )
+                )
+            } else {
+                try {
+                    val sig: Signature = Signature.getInstance("SHA256withECDSA")
+                    sig.initSign(info.key)
+                    sig.update("${info.id}${info.epoch}${info.position}".toByteArray())
+                    Base64.getEncoder().encodeToString(sig.sign())
+                } catch (e: SignatureException) {
+                    println("Couldn't sign message")
+                    return
+                }
+            }
+
+            addAllProofs(responses.stream().map {
+                Report.LocationProof.newBuilder().apply {
+                    requesterId = if (tampered > 0 && Random.nextBoolean()) {
+                        tampered--
+                        Random.nextInt(BYZ_MAX_ID_TAMPER)
+                    } else {
+                        it.requester
+                    }
+
+                    proverId = if (tampered > 0 && Random.nextBoolean()) {
+                        Random.nextInt(BYZ_MAX_ID_TAMPER)
+                    } else {
+                        it.prover
+                    }
+
+                    epoch = if (tampered > 0 && Random.nextBoolean()) {
+                        Random.nextInt(BYZ_MAX_EP_TAMPER)
+                    } else {
+                        it.epoch
+                    }
+
+                    signature = if (tampered > 0 && Random.nextBoolean()) {
+                        Base64.getEncoder().encodeToString(
+                            Random.nextBytes(
+                                BYZ_BYTES_TAMPER
+                            )
+                        )
+                    } else {
+                        it.signature
+                    }
+                }.build()
+            }.toList())
+        }.build()
+    } else {
+        // Non-byzantine request
+        Report.ReportRequest.newBuilder().apply {
+            id = info.id
+            epoch = info.epoch
+            location = Report.Coordinates.newBuilder().apply {
+                x = info.position.x
+                y = info.position.y
+            }.build()
+
+            signature = try {
+                val sig: Signature = Signature.getInstance("SHA256withECDSA")
+                sig.initSign(info.key)
+                sig.update("${info.id}${info.epoch}${info.position}".toByteArray())
+                Base64.getEncoder().encodeToString(sig.sign())
+            } catch (e: SignatureException) {
+                println("Couldn't sign message")
+                return
+            }
+
+            addAllProofs(responses.stream().map {
+                Report.LocationProof.newBuilder().apply {
+                    requesterId = it.requester
+                    proverId = it.prover
+                    epoch = it.epoch
+                    signature = it.signature
+                }.build()
+            }.toList())
+
+        }.build()
+    }
+
+
+    // Send request to server
+    val serverStub = LocationGrpcKt.LocationCoroutineStub(serverChannel)
+
+    if (serverStub.locationReport(serverRequest).ack) {
+        println("Request was OK")
+    } else {
+        println("BUSTED")
     }
 
     // Byzantine Level 0: Create non-existent request
@@ -337,34 +332,40 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
 
         val user = info.board.getRandomUser()
 
-        val serverStub = LocationGrpcKt.LocationCoroutineStub(serverChannel)
         if (serverStub.locationReport(Report.ReportRequest.newBuilder().apply {
-                requesterId = user.id
-                proverId = info.id
-
+                id = info.id
                 epoch = info.epoch
 
-                requesterLocation = Report.Coordinates.newBuilder().apply {
+                location = Report.Coordinates.newBuilder().apply {
                     x = user.coords.x
                     y = user.coords.y
                 }.build()
 
-                proverLocation = Report.Coordinates.newBuilder().apply {
-                    x = info.position.x
-                    y = info.position.y
-                }.build()
-
-                sig1 = try {
+                signature = try {
                     val sig: Signature = Signature.getInstance("SHA256withECDSA")
                     sig.initSign(info.key)
-                    sig.update("${user.id}${info.id}${info.epoch}".toByteArray())
+                    sig.update("${user.id}${info.epoch}${user.coords}".toByteArray())
                     Base64.getEncoder().encodeToString(sig.sign())
                 } catch (e: SignatureException) {
                     println("Couldn't sign message")
                     return
                 }
 
-                sig2 = sig1
+                addProofs(Report.LocationProof.newBuilder().apply {
+                    requesterId = user.id
+                    proverId = info.id
+                    epoch = info.epoch
+
+                    signature = try {
+                        val sig: Signature = Signature.getInstance("SHA256withECDSA")
+                        sig.initSign(info.key)
+                        sig.update("${user.id}${info.id}${info.epoch}".toByteArray())
+                        Base64.getEncoder().encodeToString(sig.sign())
+                    } catch (e: SignatureException) {
+                        println("Couldn't sign message")
+                        return
+                    }
+                }.build())
 
             }.build()).ack) {
             println("Request was OK :O")
