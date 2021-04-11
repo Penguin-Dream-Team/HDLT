@@ -323,7 +323,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
     if (serverStub.locationReport(serverRequest).ack) {
         println("Request was OK")
     } else {
-        println("BUSTED")
+        println("BUSTED BY THE SERVER")
     }
 
     // Byzantine Level 0: Create non-existent request

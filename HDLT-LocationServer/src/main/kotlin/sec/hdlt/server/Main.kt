@@ -1,7 +1,6 @@
 package sec.hdlt.server
 
 import io.grpc.ServerBuilder
-import kotlinx.coroutines.*
 import sec.hdlt.protos.server.LocationGrpcKt
 import sec.hdlt.protos.server.Report
 import sec.hdlt.protos.server.Server
@@ -61,32 +60,24 @@ class Location(
     private val locationReportService: LocationReportService
 ) : LocationGrpcKt.LocationCoroutineImplBase() {
     override suspend fun locationReport(request: Report.ReportRequest): Report.ReportResponse {
-        val user1 = request.requesterId
-        val user2 = request.proverId
+        val user = request.id
         val epoch = request.epoch
-        val coordinates1 = Coordinates(request.requesterLocation.x, request.requesterLocation.y)
-        val coordinates2 = Coordinates(request.proverLocation.x, request.proverLocation.y)
-        val sig1 = request.sig1
-        val sig2 = request.sig2
+        val coordinates = Coordinates(request.location.x, request.location.y)
+        val sig = request.signature
+        val proofs = request.proofsList
 
-        // FIXME: Check coordinates
-        if (!reportValidationService.validateSignature(user1, user2, epoch, sig1, sig2)) {
-            return Report.ReportResponse.newBuilder().apply {
+        return if (!reportValidationService.validateSignature(user, epoch, sig) ||
+                   !reportValidationService.validateRequest(user, epoch, proofs)
+        ) {
+            Report.ReportResponse.newBuilder().apply {
                 ack = false
             }.build()
-        }
-
-        if (!reportValidationService.validateRequest(user1, user2, coordinates1, coordinates2)) {
-            return Report.ReportResponse.newBuilder().apply {
-                ack = false
+        } else {
+            locationReportService.storeLocationReport(epoch, user, coordinates, proofs)
+            Report.ReportResponse.newBuilder().apply {
+                ack = true
             }.build()
         }
-
-        locationReportService.storeLocationReport(epoch, user1, user2, coordinates1, coordinates2)
-
-        return Report.ReportResponse.newBuilder().apply {
-            ack = true
-        }.build()
     }
 
     override suspend fun userLocationReport(request: Report.UserLocationReportRequest): Report.UserLocationReportResponse {

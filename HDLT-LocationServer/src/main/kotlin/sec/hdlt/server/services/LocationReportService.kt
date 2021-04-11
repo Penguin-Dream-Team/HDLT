@@ -2,6 +2,7 @@ package sec.hdlt.server.services
 
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
+import sec.hdlt.protos.server.Report
 import sec.hdlt.server.EPOCH_INTERVAL
 import sec.hdlt.server.data.Coordinates
 import sec.hdlt.server.data.LocationReport
@@ -15,10 +16,9 @@ class LocationReportService(directory: String) {
 
     fun storeLocationReport(
         epoch: Int,
-        user1: Int,
-        user2: Int,
-        coordinates1: Coordinates,
-        coordinates2: Coordinates
+        user: Int,
+        coordinates: Coordinates,
+        proofs: List<Report.LocationProof>
     ) {
         val file = getFile(reportsDirectory, epoch)
 
@@ -30,8 +30,13 @@ class LocationReportService(directory: String) {
         }
 
         try {
+            var storedProof = "$user $coordinates"
+            proofs.forEach { proof ->
+                storedProof += " ${proof.proverId}"
+            }
+
             FileOutputStream(file, true).bufferedWriter().use { out ->
-                out.write("$user1 $coordinates1 $user2 $coordinates2\n")
+                out.write("$storedProof\n")
             }
         } catch (ex: FileNotFoundException) {
             logger.error(ex.message)
@@ -55,10 +60,6 @@ class LocationReportService(directory: String) {
         return null
     }
 
-    private fun getFile(pathname: String, epoch: Int) : File {
-        return File("${pathname}epoch${epoch}")
-    }
-
     private fun validateLocationReports(file: File, epoch: Int) {
         try {
             val reportValidationList = file.readLines() as MutableList<String>
@@ -66,13 +67,39 @@ class LocationReportService(directory: String) {
             reportValidationList.forEach {
                 val words = it.split(" ")
 
-                if (!reportValidationList.contains("${words[2]} ${words[3]} ${words[0]} ${words[1]}")) {
-                    logger.info("BUSTED - User ${words[2]} did not communicated with the server on epoch $epoch")
+                if (words.size > 2) {
+                    val userCoordinates = getCoordinates(words[1])
+                    for (i in 2 until words.size) {
+                        val prooferCoordinates = getProoferCoordinates(reportValidationList, words[i])
+                        if (prooferCoordinates == null) {
+                            logger.info("BUSTED - User ${words[i]} did not send his report on epoch $epoch")
+
+                        } else if (!userCoordinates.isNear(prooferCoordinates)) {
+                            logger.info("BUSTED - User ${words[0]} is not close to user ${words[i]} on epoch $epoch")
+                        }
+                    }
                 }
             }
 
         } catch (ex: FileNotFoundException) {
             logger.error(ex.message)
         }
+    }
+
+    private fun getFile(pathname: String, epoch: Int) : File {
+        return File("${pathname}epoch${epoch}")
+    }
+
+    private fun getCoordinates(words: String): Coordinates {
+        return Coordinates(words[1].toInt(), words[3].toInt())
+    }
+
+    private fun getProoferCoordinates(reportValidationList: MutableList<String>, prooferId: String): Coordinates? {
+        reportValidationList.forEach {
+            val prooferReport = it.split(" ")
+            if (prooferReport[0] == prooferId)
+                return getCoordinates(prooferReport[1])
+        }
+        return null
     }
 }

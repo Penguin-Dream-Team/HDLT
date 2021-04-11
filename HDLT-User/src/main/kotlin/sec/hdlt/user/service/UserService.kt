@@ -73,16 +73,20 @@ class UserService(private val info: EpochInfo) : LocationProofGrpcKt.LocationPro
         sig.initSign(info.key)
         sig.update("${request.id}${info.id}${info.epoch}".toByteArray())
 
-        return User.LocationProofResponse.newBuilder().apply {
-            requesterId = request.id
-            epoch = info.epoch
-            proverId = info.id
-            signature = try {
-                Base64.getEncoder().encodeToString(sig.sign())
-            } catch (e: SignatureException) {
-                println("Couldn't sign message")
-                throw StatusRuntimeException(Status.UNAVAILABLE)
-            }
-        }.build()
+        if (info.id == request.id) {
+            return User.LocationProofResponse.getDefaultInstance()
+        } else {
+            return User.LocationProofResponse.newBuilder().apply {
+                requesterId = request.id
+                epoch = info.epoch
+                proverId = info.id
+                signature = try {
+                    Base64.getEncoder().encodeToString(sig.sign())
+                } catch (e: SignatureException) {
+                    println("Couldn't sign message")
+                    throw StatusRuntimeException(Status.UNAVAILABLE)
+                }
+            }.build()
+        }
     }
 }
