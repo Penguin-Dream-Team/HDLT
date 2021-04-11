@@ -34,6 +34,8 @@ const val PBKDF2_ITER = 100001
 const val MIN_TIME_COM = 0L // seconds
 const val MAX_TIME_COM = 30L // seconds
 
+const val MAX_GRPC_TIME = 60L // seconds
+
 // Byzantine options
 const val MIN_BYZ_LEV = -1 // Not byzantine
 const val MAX_BYZ_LEV =  5 // Hardest byzantine

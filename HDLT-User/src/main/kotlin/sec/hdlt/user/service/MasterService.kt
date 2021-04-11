@@ -14,6 +14,7 @@ import sec.hdlt.user.domain.*
 import java.security.Signature
 import java.security.SignatureException
 import java.util.*
+import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 import kotlin.streams.toList
 
@@ -94,7 +95,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
             launch {
                 val userChannel: ManagedChannel =
                     ManagedChannelBuilder.forAddress("localhost", user.port).usePlaintext().build()
-                val userStub = LocationProofGrpcKt.LocationProofCoroutineStub(userChannel)
+                val userStub = LocationProofGrpcKt.LocationProofCoroutineStub(userChannel).withDeadlineAfter(MAX_GRPC_TIME, TimeUnit.SECONDS)
 
                 val response: User.LocationProofResponse
 
