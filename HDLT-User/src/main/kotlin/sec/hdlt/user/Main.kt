@@ -4,6 +4,7 @@ import io.grpc.ManagedChannelBuilder
 import io.grpc.ServerBuilder
 import sec.hdlt.user.domain.Board
 import sec.hdlt.user.domain.Coordinates
+import sec.hdlt.user.domain.Database
 import sec.hdlt.user.domain.EpochInfo
 import sec.hdlt.user.service.MasterService
 import sec.hdlt.user.service.UserService
@@ -35,6 +36,8 @@ const val MIN_TIME_COM = 0L // seconds
 const val MAX_TIME_COM = 30L // seconds
 
 const val MAX_GRPC_TIME = 60L // seconds
+
+const val MAX_EPOCH_AHEAD = 10 // How many epochs can a user be ahead of another one
 
 // Byzantine options
 const val MIN_BYZ_LEV = -1 // Not byzantine
@@ -93,12 +96,13 @@ fun main(args: Array<String>) {
     // Get private key
     val privKey: PrivateKey = keyStore.getKey(KEY_ALIAS_PREFIX + id, deriveKey(PASS_PREFIX + id).toCharArray()) as PrivateKey
 
-    val userInfo = EpochInfo(id, Coordinates(-1, -1), -1, Board(), privKey, keyStore, byzantine)
+    // Initialize global DB
+    Database(id, keyStore, privKey, byzantine, mutableMapOf())
 
     // Initialize server
     val server = ServerBuilder.forPort(listen)
-        .addService(MasterService(userInfo, channel))
-        .addService(UserService(userInfo))
+        .addService(MasterService(channel))
+        .addService(UserService())
         .build()
 
     server.start()

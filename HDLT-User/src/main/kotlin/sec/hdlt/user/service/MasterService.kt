@@ -18,32 +18,33 @@ import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 import kotlin.streams.toList
 
-class MasterService(private val info: EpochInfo, private val serverChannel: ManagedChannel) :
+class MasterService(private val serverChannel: ManagedChannel, private val mutex: Mutex = Mutex()) :
     HDLTMasterGrpcKt.HDLTMasterCoroutineImplBase() {
+
     override suspend fun broadcastEpoch(request: Master.BroadcastEpochRequest): Master.BroadcastEpochResponse {
         println("Receiving epoch ${request.epoch}")
-        info.epoch = request.epoch
 
-        // FIXME: Store all boards
-        info.board = Board()
+        val board = Board()
 
         // Fill board
         request.cellsList.stream()
-            .forEach { info.board.addUser(UserInfo(it.userId, Coordinates(it.x, it.y))) }
+            .forEach { board.addUser(UserInfo(it.userId, Coordinates(it.x, it.y))) }
 
-        info.position = info.board.getUser(info.id).coords
+        val info = EpochInfo(board.getUserCoords(Database.id), request.epoch, board)
+
+        mutex.withLock {
+            Database.epochs.put(request.epoch, info)
+        }
 
         GlobalScope.launch {
-            val userInfo = info.clone()
-
             // FIXME: activate this
             //delay(Random.nextLong(MIN_TIME_COM, MAX_TIME_COM) * 1000)
 
-            communicate(userInfo, serverChannel)
+            communicate(info, serverChannel)
         }
 
         return Master.BroadcastEpochResponse.newBuilder().apply {
-            userId = info.id
+            userId = Database.id
             ok = true
         }.build()
     }
@@ -51,7 +52,7 @@ class MasterService(private val info: EpochInfo, private val serverChannel: Mana
 
 suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
     // Byzantine Level 1: Skip communication
-    if (info.byzantineLevel >= 1 && Random.nextInt(100) < BYZ_PROB_NOT_SEND) {
+    if (Database.byzantineLevel >= 1 && Random.nextInt(100) < BYZ_PROB_NOT_SEND) {
         return
     }
 
@@ -60,24 +61,24 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
     // Byzantine Level 2: Tamper with fields
     // Create request once (will be equal for all gRPC calls)
     val request = User.LocationProofRequest.newBuilder().apply {
-        id = if(info.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
+        id = if(Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
             Random.nextInt(BYZ_MAX_ID_TAMPER)
         } else {
-            info.id
+            Database.id
         }
-        epoch = if (info.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
+        epoch = if (Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
             Random.nextInt(BYZ_MAX_EP_TAMPER)
         } else {
             info.epoch
         }
 
-        signature = if (info.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
+        signature = if (Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
            Base64.getEncoder().encodeToString(Random.nextBytes(BYZ_BYTES_TAMPER))
         } else {
             try {
                 val sig: Signature = Signature.getInstance("SHA256withECDSA")
-                sig.initSign(info.key)
-                sig.update("${info.id}${info.epoch}".toByteArray())
+                sig.initSign(Database.key)
+                sig.update("${Database.id}${info.epoch}".toByteArray())
                 Base64.getEncoder().encodeToString(sig.sign())
             } catch (e: SignatureException) {
                 println("Couldn't sign message")
@@ -147,7 +148,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 }
 
                 // Byzantine Level 5: No verification of data
-                if (info.byzantineLevel >= 5 && Random.nextInt(100) < BYZ_PROB_NO_VER) {
+                if (Database.byzantineLevel >= 5 && Random.nextInt(100) < BYZ_PROB_NO_VER) {
                     // Skip verifications
                 } else {
                     // Check response
@@ -156,7 +157,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                         )
                     ) {
                         return@launch
-                    } else if (user.id != response.proverId || info.id != response.requesterId) {
+                    } else if (user.id != response.proverId || Database.id != response.requesterId) {
                         println("User ids do not match")
                         return@launch
                     } else if (info.epoch != response.epoch) {
@@ -170,8 +171,8 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                     // Check signature
                     try {
                         val sig: Signature = Signature.getInstance("SHA256withECDSA")
-                        sig.initVerify(info.keyStore.getCertificate(KEY_ALIAS_PREFIX + user.id))
-                        sig.update("${info.id}${user.id}${info.epoch}".toByteArray())
+                        sig.initVerify(Database.keyStore.getCertificate(KEY_ALIAS_PREFIX + user.id))
+                        sig.update("${Database.id}${user.id}${info.epoch}".toByteArray())
                         if (!sig.verify(Base64.getDecoder().decode(response.signature))) {
                             println("Invalid signature detected")
                             userChannel.shutdownNow()
@@ -200,8 +201,12 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
         } // for loop
     } // Coroutine scope
 
+    if (responses.size == 0) {
+        return
+    }
+
     // Byzantine Level 2: Tamper with fields
-    val serverRequest: Report.ReportRequest = if (info.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
+    val serverRequest: Report.ReportRequest = if (Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
         println("Tampering with request to server fields")
         var tampered = BYZ_MAX_TIMES_TAMPER
         Report.ReportRequest.newBuilder().apply {
@@ -209,7 +214,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 tampered--
                 Random.nextInt(BYZ_MAX_ID_TAMPER)
             } else {
-                info.id
+                Database.id
             }
 
             epoch = if (tampered > 0 && Random.nextBoolean()) {
@@ -243,8 +248,8 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
             } else {
                 try {
                     val sig: Signature = Signature.getInstance("SHA256withECDSA")
-                    sig.initSign(info.key)
-                    sig.update("${info.id}${info.epoch}${info.position}".toByteArray())
+                    sig.initSign(Database.key)
+                    sig.update("${Database.id}${info.epoch}${info.position}".toByteArray())
                     Base64.getEncoder().encodeToString(sig.sign())
                 } catch (e: SignatureException) {
                     println("Couldn't sign message")
@@ -288,7 +293,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
     } else {
         // Non-byzantine request
         Report.ReportRequest.newBuilder().apply {
-            id = info.id
+            id = Database.id
             epoch = info.epoch
             location = Report.Coordinates.newBuilder().apply {
                 x = info.position.x
@@ -297,8 +302,8 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
 
             signature = try {
                 val sig: Signature = Signature.getInstance("SHA256withECDSA")
-                sig.initSign(info.key)
-                sig.update("${info.id}${info.epoch}${info.position}".toByteArray())
+                sig.initSign(Database.key)
+                sig.update("${Database.id}${info.epoch}${info.position}".toByteArray())
                 Base64.getEncoder().encodeToString(sig.sign())
             } catch (e: SignatureException) {
                 println("Couldn't sign message")
@@ -328,13 +333,13 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
     }
 
     // Byzantine Level 0: Create non-existent request
-    if (info.byzantineLevel >= 0 && Random.nextInt(100) < BYZ_PROB_DUMB) {
+    if (Database.byzantineLevel >= 0 && Random.nextInt(100) < BYZ_PROB_DUMB) {
         println("Forging location proof")
 
         val user = info.board.getRandomUser()
 
         if (serverStub.locationReport(Report.ReportRequest.newBuilder().apply {
-                id = info.id
+                id = Database.id
                 epoch = info.epoch
 
                 location = Report.Coordinates.newBuilder().apply {
@@ -344,7 +349,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
 
                 signature = try {
                     val sig: Signature = Signature.getInstance("SHA256withECDSA")
-                    sig.initSign(info.key)
+                    sig.initSign(Database.key)
                     sig.update("${user.id}${info.epoch}${user.coords}".toByteArray())
                     Base64.getEncoder().encodeToString(sig.sign())
                 } catch (e: SignatureException) {
@@ -354,13 +359,13 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
 
                 addProofs(Report.LocationProof.newBuilder().apply {
                     requesterId = user.id
-                    proverId = info.id
+                    proverId = Database.id
                     epoch = info.epoch
 
                     signature = try {
                         val sig: Signature = Signature.getInstance("SHA256withECDSA")
-                        sig.initSign(info.key)
-                        sig.update("${user.id}${info.id}${info.epoch}".toByteArray())
+                        sig.initSign(Database.key)
+                        sig.update("${user.id}${Database.id}${info.epoch}".toByteArray())
                         Base64.getEncoder().encodeToString(sig.sign())
                     } catch (e: SignatureException) {
                         println("Couldn't sign message")
