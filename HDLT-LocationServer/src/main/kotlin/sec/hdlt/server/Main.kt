@@ -22,10 +22,11 @@ fun main() {
     // Load the keystore
     val keyStore = KeyStore.getInstance("jks")
     val keystoreFile: InputStream = object {}.javaClass.getResourceAsStream(KEYSTORE_FILE)
-    val reportsDirectory: String = System.getProperty("user.dir") + "/reports"
+    val reportsDirectory: String = System.getProperty("user.dir") + "/reports/"
     val locationReportService = LocationReportService(reportsDirectory)
     val reportValidationService = ReportValidationService(keyStore)
 
+    locationReportService.clearOldReports()
     try {
         keyStore.load(keystoreFile, KEYSTORE_PASS.toCharArray())
     } catch(e: IOException) {
@@ -93,7 +94,7 @@ class Location(
             }.build()
         }
 
-        val locationReport = locationReportService.getLocationReport(user, epoch)
+        val locationReport = locationReportService.getLocationReport(user.toLong(), epoch)
         return Report.UserLocationReportResponse.newBuilder().apply {
             if (locationReport != null) {
                 val coordinates = Report.Coordinates.newBuilder().apply {
