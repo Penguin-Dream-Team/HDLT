@@ -6,15 +6,23 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import sec.hdlt.protos.master.*
 import sec.hdlt.protos.server.*
 import sec.hdlt.protos.user.*
 import sec.hdlt.user.*
 import sec.hdlt.user.domain.*
+import java.security.PublicKey
+import java.security.SecureRandom
 import java.security.Signature
 import java.security.SignatureException
 import java.util.*
 import java.util.concurrent.TimeUnit
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.IvParameterSpec
 import kotlin.random.Random
 import kotlin.streams.toList
 
@@ -61,7 +69,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
     // Byzantine Level 2: Tamper with fields
     // Create request once (will be equal for all gRPC calls)
     val request = User.LocationProofRequest.newBuilder().apply {
-        id = if(Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
+        id = if (Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
             Random.nextInt(BYZ_MAX_ID_TAMPER)
         } else {
             Database.id
@@ -73,7 +81,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
         }
 
         signature = if (Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
-           Base64.getEncoder().encodeToString(Random.nextBytes(BYZ_BYTES_TAMPER))
+            Base64.getEncoder().encodeToString(Random.nextBytes(BYZ_BYTES_TAMPER))
         } else {
             try {
                 val sig: Signature = Signature.getInstance("SHA256withRSA")
@@ -88,7 +96,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
     }.build()
 
     val mutex = Mutex()
-    val responses = mutableListOf<Proof>()
+    val proofs = mutableListOf<Proof>()
 
     // Launch call for each user
     coroutineScope {
@@ -96,7 +104,8 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
             launch {
                 val userChannel: ManagedChannel =
                     ManagedChannelBuilder.forAddress("localhost", user.port).usePlaintext().build()
-                val userStub = LocationProofGrpcKt.LocationProofCoroutineStub(userChannel).withDeadlineAfter(MAX_GRPC_TIME, TimeUnit.SECONDS)
+                val userStub = LocationProofGrpcKt.LocationProofCoroutineStub(userChannel)
+                    .withDeadlineAfter(MAX_GRPC_TIME, TimeUnit.SECONDS)
 
                 val response: User.LocationProofResponse
 
@@ -187,7 +196,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                     }
 
                     mutex.withLock {
-                        responses.add(
+                        proofs.add(
                             Proof(
                                 response.requesterId,
                                 response.proverId,
@@ -201,44 +210,52 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
         } // for loop
     } // Coroutine scope
 
-    if (responses.size == 0) {
+    if (proofs.size == 0) {
         return
     }
 
     // Byzantine Level 2: Tamper with fields
-    val serverRequest: Report.ReportRequest = if (Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
+    val report: ReportInfo = if (Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
         println("Tampering with request to server fields")
         var tampered = BYZ_MAX_TIMES_TAMPER
-        Report.ReportRequest.newBuilder().apply {
-            id = if (tampered > 0 && Random.nextBoolean()) {
+
+        ReportInfo(
+            // Id
+            if (tampered > 0 && Random.nextBoolean()) {
                 tampered--
                 Random.nextInt(BYZ_MAX_ID_TAMPER)
             } else {
                 Database.id
-            }
+            },
 
-            epoch = if (tampered > 0 && Random.nextBoolean()) {
+            // Epoch
+            if (tampered > 0 && Random.nextBoolean()) {
                 tampered--
                 Random.nextInt(BYZ_MAX_EP_TAMPER)
             } else {
                 info.epoch
-            }
+            },
 
-            location = Report.Coordinates.newBuilder().apply {
-                x = if (tampered > 0 && Random.nextBoolean()) {
+            // Location
+            Coordinates(
+                // X coord
+                if (tampered > 0 && Random.nextBoolean()) {
                     tampered--
                     Random.nextInt(BYZ_MAX_COORDS_TAMPER)
                 } else {
                     info.position.x
-                }
-                y = if (tampered > 0 && Random.nextBoolean()) {
+                },
+
+                // Y coord
+                if (tampered > 0 && Random.nextBoolean()) {
                     Random.nextInt(BYZ_MAX_COORDS_TAMPER)
                 } else {
                     info.position.y
                 }
-            }.build()
+            ),
 
-            signature = if (tampered > 0 && Random.nextBoolean()) {
+            // Signature
+            if (tampered > 0 && Random.nextBoolean()) {
                 tampered--
                 Base64.getEncoder().encodeToString(
                     Random.nextBytes(
@@ -255,30 +272,35 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                     println("Couldn't sign message")
                     return
                 }
-            }
+            },
 
-            addAllProofs(responses.stream().map {
-                Report.LocationProof.newBuilder().apply {
-                    requesterId = if (tampered > 0 && Random.nextBoolean()) {
+            // Location proofs
+            proofs.stream().map {
+                Proof(
+                    // Requester Id
+                    if (tampered > 0 && Random.nextBoolean()) {
                         tampered--
                         Random.nextInt(BYZ_MAX_ID_TAMPER)
                     } else {
                         it.requester
-                    }
+                    },
 
-                    proverId = if (tampered > 0 && Random.nextBoolean()) {
+                    // Prover Id
+                    if (tampered > 0 && Random.nextBoolean()) {
                         Random.nextInt(BYZ_MAX_ID_TAMPER)
                     } else {
                         it.prover
-                    }
+                    },
 
-                    epoch = if (tampered > 0 && Random.nextBoolean()) {
+                    // Epoch
+                    if (tampered > 0 && Random.nextBoolean()) {
                         Random.nextInt(BYZ_MAX_EP_TAMPER)
                     } else {
                         it.epoch
-                    }
+                    },
 
-                    signature = if (tampered > 0 && Random.nextBoolean()) {
+                    // Signature
+                    if (tampered > 0 && Random.nextBoolean()) {
                         Base64.getEncoder().encodeToString(
                             Random.nextBytes(
                                 BYZ_BYTES_TAMPER
@@ -287,20 +309,18 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                     } else {
                         it.signature
                     }
-                }.build()
-            }.toList())
-        }.build()
+                )
+            }.toList()
+        )
     } else {
         // Non-byzantine request
-        Report.ReportRequest.newBuilder().apply {
-            id = Database.id
-            epoch = info.epoch
-            location = Report.Coordinates.newBuilder().apply {
-                x = info.position.x
-                y = info.position.y
-            }.build()
+        ReportInfo(
+            Database.id,
+            info.epoch,
+            info.position,
 
-            signature = try {
+            // Signature
+            try {
                 val sig: Signature = Signature.getInstance("SHA256withRSA")
                 sig.initSign(Database.key)
                 sig.update("${Database.id}${info.epoch}${info.position}".toByteArray())
@@ -308,20 +328,21 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
             } catch (e: SignatureException) {
                 println("Couldn't sign message")
                 return
-            }
+            },
 
-            addAllProofs(responses.stream().map {
-                Report.LocationProof.newBuilder().apply {
-                    requesterId = it.requester
-                    proverId = it.prover
-                    epoch = it.epoch
-                    signature = it.signature
-                }.build()
-            }.toList())
-
-        }.build()
+            // Location Proofs
+            proofs
+        )
     }
 
+    val serverRequest: Report.ReportRequest = Report.ReportRequest.newBuilder().apply {
+        val secret = generateKey()
+        val messageNonce = generateNonce()
+        val serverCert = Database.serverCert
+        key = asymmetricCipher(serverCert.publicKey, Base64.getEncoder().encodeToString(secret.encoded))
+        nonce = Base64.getEncoder().encodeToString(messageNonce)
+        ciphertext = symmetricCipher(secret, Json.encodeToString(report), messageNonce)
+    }.build()
 
     // Send request to server
     val serverStub = LocationGrpcKt.LocationCoroutineStub(serverChannel)
@@ -338,31 +359,40 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
 
         val user = info.board.getRandomUser()
 
-        if (serverStub.locationReport(Report.ReportRequest.newBuilder().apply {
-                id = Database.id
-                epoch = info.epoch
+        val report = ReportInfo(
+            // Id
+            Database.id,
 
-                location = Report.Coordinates.newBuilder().apply {
-                    x = user.coords.x
-                    y = user.coords.y
-                }.build()
+            // Epoch
+            info.epoch,
 
-                signature = try {
-                    val sig: Signature = Signature.getInstance("SHA256withRSA")
-                    sig.initSign(Database.key)
-                    sig.update("${user.id}${info.epoch}${user.coords}".toByteArray())
-                    Base64.getEncoder().encodeToString(sig.sign())
-                } catch (e: SignatureException) {
-                    println("Couldn't sign message")
-                    return
-                }
+            // Location
+            user.coords,
 
-                addProofs(Report.LocationProof.newBuilder().apply {
-                    requesterId = user.id
-                    proverId = Database.id
-                    epoch = info.epoch
+            // Signature
+            try {
+                val sig: Signature = Signature.getInstance("SHA256withRSA")
+                sig.initSign(Database.key)
+                sig.update("${Database.id}${info.epoch}${user.coords}".toByteArray())
+                Base64.getEncoder().encodeToString(sig.sign())
+            } catch (e: SignatureException) {
+                println("Couldn't sign message")
+                return
+            },
 
-                    signature = try {
+            mutableListOf(
+                Proof(
+                    // Requester
+                    user.id,
+
+                    // Prover
+                    Database.id,
+
+                    // Epoch
+                    info.epoch,
+
+                    // Signature
+                    try {
                         val sig: Signature = Signature.getInstance("SHA256withRSA")
                         sig.initSign(Database.key)
                         sig.update("${user.id}${Database.id}${info.epoch}".toByteArray())
@@ -371,12 +401,52 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                         println("Couldn't sign message")
                         return
                     }
-                }.build())
+                )
+            )
+        )
 
+        if (serverStub.locationReport(Report.ReportRequest.newBuilder().apply {
+                val secret = generateKey()
+                val messageNonce = generateNonce()
+                val serverCert = Database.serverCert
+                key = asymmetricCipher(serverCert.publicKey, Base64.getEncoder().encodeToString(secret.encoded))
+                nonce = Base64.getEncoder().encodeToString(messageNonce)
+                ciphertext = symmetricCipher(secret, Json.encodeToString(report), messageNonce)
             }.build()).ack) {
             println("Request was OK :O")
         } else {
             println("Dumb user busted")
         }
     }
+}
+
+const val SYM_NONCE_LEN = 12
+const val SYM_KEY_SIZE = 256
+
+fun generateKey(): SecretKey {
+    val generator: KeyGenerator = KeyGenerator.getInstance("ChaCha20-Poly1305")
+    generator.init(SYM_KEY_SIZE, SecureRandom.getInstanceStrong())
+
+    return generator.generateKey()
+}
+
+fun generateNonce(): ByteArray {
+    val nonce = ByteArray(SYM_NONCE_LEN)
+    SecureRandom().nextBytes(nonce)
+    return nonce
+}
+
+fun asymmetricCipher(key: PublicKey, plaintext: String): String {
+    val cipher: Cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding")
+    cipher.init(Cipher.ENCRYPT_MODE, key)
+
+    return Base64.getEncoder().encodeToString(cipher.doFinal(plaintext.toByteArray()))
+}
+
+fun symmetricCipher(key: SecretKey, plaintext: String, nonce: ByteArray): String {
+    val cipher: Cipher = Cipher.getInstance("ChaCha20-Poly1305")
+    val iv = IvParameterSpec(nonce)
+    cipher.init(Cipher.ENCRYPT_MODE, key, iv)
+
+    return Base64.getEncoder().encodeToString(cipher.doFinal(plaintext.toByteArray()))
 }

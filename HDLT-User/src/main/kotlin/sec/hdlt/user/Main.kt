@@ -2,16 +2,15 @@ package sec.hdlt.user
 
 import io.grpc.ManagedChannelBuilder
 import io.grpc.ServerBuilder
-import sec.hdlt.user.domain.Board
-import sec.hdlt.user.domain.Coordinates
 import sec.hdlt.user.domain.Database
-import sec.hdlt.user.domain.EpochInfo
 import sec.hdlt.user.service.MasterService
 import sec.hdlt.user.service.UserService
 import java.io.IOException
 import java.io.InputStream
 import java.security.KeyStore
 import java.security.PrivateKey
+import java.security.PublicKey
+import java.security.cert.Certificate
 import java.security.cert.CertificateException
 import java.security.spec.KeySpec
 import java.util.*
@@ -24,6 +23,7 @@ const val BASE_PORT: Int = 8100
 const val KEYSTORE_FILE = "/keystore.jks"
 const val KEYSTORE_PASS = "UL764S3C637P4SSW06D"
 const val KEY_ALIAS_PREFIX = "hdlt_user_"
+const val KEY_ALIAS_SERVER = "hdlt_server"
 
 // Password relative params
 const val PASS_SALT = "secret_salt"
@@ -41,19 +41,19 @@ const val MAX_EPOCH_AHEAD = 10 // How many epochs can a user be ahead of another
 
 // Byzantine options
 const val MIN_BYZ_LEV = -1 // Not byzantine
-const val MAX_BYZ_LEV =  5 // Hardest byzantine
-const val BYZ_PROB_DUMB     = 30 // Probability of forging requests with same signature to server
+const val MAX_BYZ_LEV = 5 // Hardest byzantine
+const val BYZ_PROB_DUMB = 30 // Probability of forging requests with same signature to server
 const val BYZ_PROB_NOT_SEND = 20 // Probability of not communicating with near (and server consequently)
-const val BYZ_PROB_TAMPER   = 45 // Probability of tampering one of the fields in request to server
-const val BYZ_PROB_REJ_REQ  = 45 // Probability of rejecting another user's request
+const val BYZ_PROB_TAMPER = 45 // Probability of tampering one of the fields in request to server
+const val BYZ_PROB_REJ_REQ = 45 // Probability of rejecting another user's request
 const val BYZ_PROB_PASS_REQ = 35 // Probability of redirecting request to other user
-const val BYZ_PROB_NO_VER   = 50 // Probability of not verifying information
+const val BYZ_PROB_NO_VER = 50 // Probability of not verifying information
 
-const val BYZ_MAX_TIMES_TAMPER  = 5
-const val BYZ_MAX_ID_TAMPER     = 100
-const val BYZ_MAX_EP_TAMPER     = 100
+const val BYZ_MAX_TIMES_TAMPER = 5
+const val BYZ_MAX_ID_TAMPER = 100
+const val BYZ_MAX_EP_TAMPER = 100
 const val BYZ_MAX_COORDS_TAMPER = 100
-const val BYZ_BYTES_TAMPER      = 40
+const val BYZ_BYTES_TAMPER = 40
 
 fun main(args: Array<String>) {
     val keystoreFile: InputStream = object {}.javaClass.getResourceAsStream(KEYSTORE_FILE)
@@ -62,10 +62,10 @@ fun main(args: Array<String>) {
 
     try {
         keyStore.load(keystoreFile, KEYSTORE_PASS.toCharArray())
-    } catch(e: IOException) {
+    } catch (e: IOException) {
         println("Couldn't open KeyStore file")
         return
-    } catch(e: CertificateException) {
+    } catch (e: CertificateException) {
         println("Couldn't load all keys/certificates")
         return
     }
@@ -94,10 +94,14 @@ fun main(args: Array<String>) {
         .build()
 
     // Get private key
-    val privKey: PrivateKey = keyStore.getKey(KEY_ALIAS_PREFIX + id, deriveKey(PASS_PREFIX + id).toCharArray()) as PrivateKey
+    val privKey: PrivateKey =
+        keyStore.getKey(KEY_ALIAS_PREFIX + id, deriveKey(PASS_PREFIX + id).toCharArray()) as PrivateKey
+
+    // Get server key
+    val serverCert: Certificate = keyStore.getCertificate(KEY_ALIAS_SERVER)
 
     // Initialize global DB
-    Database(id, keyStore, privKey, byzantine, mutableMapOf())
+    Database(id, keyStore, privKey, serverCert, byzantine, mutableMapOf())
 
     // Initialize server
     val server = ServerBuilder.forPort(listen)
