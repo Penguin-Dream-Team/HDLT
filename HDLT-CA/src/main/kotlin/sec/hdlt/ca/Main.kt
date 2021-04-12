@@ -157,7 +157,7 @@ fun initCA() {
     // Generate self-signed certificate
     val certificate = signCSR(csr, keyPair.private)
 
-    val array: Array<X509Certificate> = Array(1) { i -> certificate }
+    val array: Array<X509Certificate> = Array(1) { certificate }
 
     // Add key and certificate to keystore
     keyStore.setKeyEntry(CA_KEY_ALIAS, keyPair.private, CA_KEY_PASS.toCharArray(), array)

@@ -1,5 +1,8 @@
 package sec.hdlt.server.data
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 class Coordinates(val x: Int, val y: Int) {
     fun isNear(other: Coordinates): Boolean {
         return kotlin.math.abs(x - other.x) <= 1 && kotlin.math.abs(y - other.y) <= 1

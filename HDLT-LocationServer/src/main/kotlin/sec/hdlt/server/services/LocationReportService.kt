@@ -2,14 +2,13 @@ package sec.hdlt.server.services
 
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
-import sec.hdlt.protos.server.Report
 import sec.hdlt.server.EPOCH_INTERVAL
 import sec.hdlt.server.data.Coordinates
-import sec.hdlt.server.data.LocationReport
+import sec.hdlt.server.data.Proof
+import sec.hdlt.server.data.ReportInfo
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
-import kotlin.math.log
 
 const val DELAY_TIME = 4
 const val FLAGGED_AMOUNT = 3
@@ -26,7 +25,7 @@ class LocationReportService(directory: String) {
     fun clearOldReports() {
         File(reportsDirectory).listFiles().forEach { file ->
             if (file.name.startsWith("epoch")) {
-                file.delete();
+                file.delete()
             }
         }
     }
@@ -35,7 +34,7 @@ class LocationReportService(directory: String) {
         epoch: Int,
         user: Int,
         coordinates: Coordinates,
-        proofs: List<Report.LocationProof>
+        proofs: List<Proof>
     ) {
         val file = getFile(reportsDirectory, epoch)
 
@@ -49,7 +48,7 @@ class LocationReportService(directory: String) {
         try {
             var storedProof = "$user $coordinates"
             proofs.forEach { proof ->
-                storedProof += " ${proof.proverId}"
+                storedProof += " ${proof.prover}"
             }
 
             FileOutputStream(file, true).bufferedWriter().use { out ->
@@ -60,7 +59,7 @@ class LocationReportService(directory: String) {
         }
     }
 
-    fun getLocationReport(userId: Long, epoch: Int): LocationReport? {
+    fun getLocationReport(userId: Long, epoch: Int): ReportInfo? {
         if (byzantineUsers[userId]!!) {
             return null
         }
@@ -71,7 +70,7 @@ class LocationReportService(directory: String) {
                 val words = it.split(" ")
                 if (words[0] == userId.toString()) {
                     val coordinates = Coordinates(words[1].toInt(), words[2].toInt())
-                    return LocationReport(userId.toInt(), epoch, coordinates)
+                    return ReportInfo(userId.toInt(), epoch, coordinates)
                 }
             }
         } catch (ex: FileNotFoundException) {

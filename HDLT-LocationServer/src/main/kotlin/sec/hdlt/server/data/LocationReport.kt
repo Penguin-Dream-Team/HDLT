@@ -1,7 +1,12 @@
 package sec.hdlt.server.data
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class LocationReport(
-    val user: Int,
+    val id: Int,
     val epoch: Int,
-    val coordinates: Coordinates,
+    val location: Coordinates,
+    val signature: String,
+    val proofs: List<Proof>
 )

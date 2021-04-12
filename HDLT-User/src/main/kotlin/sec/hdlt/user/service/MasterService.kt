@@ -421,10 +421,10 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
 }
 
 const val SYM_NONCE_LEN = 12
-const val SYM_KEY_SIZE = 256
+const val SYM_KEY_SIZE = 32
 
 fun generateKey(): SecretKey {
-    val generator: KeyGenerator = KeyGenerator.getInstance("ChaCha20-Poly1305")
+    val generator: KeyGenerator = KeyGenerator.getInstance("ChaCha20")
     generator.init(SYM_KEY_SIZE, SecureRandom.getInstanceStrong())
 
     return generator.generateKey()

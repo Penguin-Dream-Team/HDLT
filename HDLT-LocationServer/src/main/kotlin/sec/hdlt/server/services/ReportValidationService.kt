@@ -1,8 +1,7 @@
 package sec.hdlt.server.services
 
-import sec.hdlt.protos.server.Report
-import sec.hdlt.server.KEY_ALIAS_PREFIX
-import sec.hdlt.server.data.Coordinates
+import sec.hdlt.server.KEY_USER_PREFIX
+import sec.hdlt.server.data.Proof
 import java.security.KeyStore
 import java.security.Signature
 import java.security.SignatureException
@@ -17,7 +16,7 @@ class ReportValidationService(private val keyStore: KeyStore) {
     ): Boolean {
         return try {
             val signature: Signature = Signature.getInstance("SHA256withRSA")
-            signature.initVerify(keyStore.getCertificate(KEY_ALIAS_PREFIX + user))
+            signature.initVerify(keyStore.getCertificate(KEY_USER_PREFIX + user))
             signature.update("${user}${epoch}".toByteArray())
             signature.verify(Base64.getDecoder().decode(sig))
             true
@@ -34,15 +33,15 @@ class ReportValidationService(private val keyStore: KeyStore) {
     fun validateRequest(
         user: Int,
         epoch: Int,
-        proofs: List<Report.LocationProof>
+        proofs: List<Proof>
     ): Boolean {
         proofs.forEach { proof ->
-            if (validateSignature(proof.proverId, proof.epoch, proof.signature)) {
-                if (user != proof.requesterId ||
-                    user == proof.proverId ||
+            if (validateSignature(proof.prover, proof.epoch, proof.signature)) {
+                if (user != proof.requester ||
+                    user == proof.prover ||
                     epoch != proof.epoch
                 ) {
-                    println("Invalid proof for user $user sent by user ${proof.proverId} on epoch $epoch")
+                    println("Invalid proof for user $user sent by user ${proof.prover} on epoch $epoch")
                     return false
                 }
             } else return false
