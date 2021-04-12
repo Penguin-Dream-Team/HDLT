@@ -57,7 +57,7 @@ class UserService : LocationProofGrpcKt.LocationProofCoroutineImplBase() {
         }
 
         // Check signature
-        var sig: Signature = Signature.getInstance("SHA256withECDSA")
+        var sig: Signature = Signature.getInstance("SHA256withRSA")
 
         // Byzantine Level 5: No verification of data
         if (Database.byzantineLevel >= 5 && Random.nextInt(100) < BYZ_PROB_NO_VER) {
@@ -86,7 +86,7 @@ class UserService : LocationProofGrpcKt.LocationProofCoroutineImplBase() {
         }
 
         // Send response with new signature
-        sig = Signature.getInstance("SHA256withECDSA")
+        sig = Signature.getInstance("SHA256withRSA")
         sig.initSign(Database.key)
         sig.update("${request.id}${Database.id}${info.epoch}".toByteArray())
 

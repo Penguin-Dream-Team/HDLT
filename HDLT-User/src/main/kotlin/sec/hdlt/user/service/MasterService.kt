@@ -76,7 +76,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
            Base64.getEncoder().encodeToString(Random.nextBytes(BYZ_BYTES_TAMPER))
         } else {
             try {
-                val sig: Signature = Signature.getInstance("SHA256withECDSA")
+                val sig: Signature = Signature.getInstance("SHA256withRSA")
                 sig.initSign(Database.key)
                 sig.update("${Database.id}${info.epoch}".toByteArray())
                 Base64.getEncoder().encodeToString(sig.sign())
@@ -170,7 +170,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
 
                     // Check signature
                     try {
-                        val sig: Signature = Signature.getInstance("SHA256withECDSA")
+                        val sig: Signature = Signature.getInstance("SHA256withRSA")
                         sig.initVerify(Database.keyStore.getCertificate(KEY_ALIAS_PREFIX + user.id))
                         sig.update("${Database.id}${user.id}${info.epoch}".toByteArray())
                         if (!sig.verify(Base64.getDecoder().decode(response.signature))) {
@@ -247,7 +247,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 )
             } else {
                 try {
-                    val sig: Signature = Signature.getInstance("SHA256withECDSA")
+                    val sig: Signature = Signature.getInstance("SHA256withRSA")
                     sig.initSign(Database.key)
                     sig.update("${Database.id}${info.epoch}${info.position}".toByteArray())
                     Base64.getEncoder().encodeToString(sig.sign())
@@ -301,7 +301,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
             }.build()
 
             signature = try {
-                val sig: Signature = Signature.getInstance("SHA256withECDSA")
+                val sig: Signature = Signature.getInstance("SHA256withRSA")
                 sig.initSign(Database.key)
                 sig.update("${Database.id}${info.epoch}${info.position}".toByteArray())
                 Base64.getEncoder().encodeToString(sig.sign())
@@ -348,7 +348,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 }.build()
 
                 signature = try {
-                    val sig: Signature = Signature.getInstance("SHA256withECDSA")
+                    val sig: Signature = Signature.getInstance("SHA256withRSA")
                     sig.initSign(Database.key)
                     sig.update("${user.id}${info.epoch}${user.coords}".toByteArray())
                     Base64.getEncoder().encodeToString(sig.sign())
@@ -363,7 +363,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                     epoch = info.epoch
 
                     signature = try {
-                        val sig: Signature = Signature.getInstance("SHA256withECDSA")
+                        val sig: Signature = Signature.getInstance("SHA256withRSA")
                         sig.initSign(Database.key)
                         sig.update("${user.id}${Database.id}${info.epoch}".toByteArray())
                         Base64.getEncoder().encodeToString(sig.sign())

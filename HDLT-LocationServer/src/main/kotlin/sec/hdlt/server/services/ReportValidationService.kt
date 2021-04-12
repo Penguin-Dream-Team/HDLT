@@ -16,7 +16,7 @@ class ReportValidationService(private val keyStore: KeyStore) {
         sig: String
     ): Boolean {
         return try {
-            val signature: Signature = Signature.getInstance("SHA256withECDSA")
+            val signature: Signature = Signature.getInstance("SHA256withRSA")
             signature.initVerify(keyStore.getCertificate(KEY_ALIAS_PREFIX + user))
             signature.update("${user}${epoch}".toByteArray())
             signature.verify(Base64.getDecoder().decode(sig))

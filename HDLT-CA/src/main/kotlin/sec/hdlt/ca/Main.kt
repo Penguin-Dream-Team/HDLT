@@ -9,7 +9,7 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.ContentSigner
 import org.bouncycastle.operator.DefaultDigestAlgorithmIdentifierFinder
 import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder
-import org.bouncycastle.operator.bc.BcECContentSignerBuilder
+import org.bouncycastle.operator.bc.BcRSAContentSignerBuilder
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 import org.bouncycastle.pkcs.PKCS10CertificationRequest
 import org.bouncycastle.pkcs.PKCS10CertificationRequestBuilder
@@ -34,7 +34,7 @@ const val CA_KS_PASS = "SUP36S3C637P4SS"
 
 const val CA_KEY_ALIAS = "CA_KEY"
 const val CA_KEY_PASS = "4N07H36S3C637P4SS"
-const val CA_KEY_SIZE = 384
+const val CA_KEY_SIZE = 4096
 
 const val PBKDF2_ITER = 100001
 const val PBKDF2_KEY_SIZE = 512
@@ -166,7 +166,7 @@ fun initCA() {
 }
 
 fun generateKeyPair(): KeyPair {
-    val keyGenerator: KeyPairGenerator = KeyPairGenerator.getInstance("EC")
+    val keyGenerator: KeyPairGenerator = KeyPairGenerator.getInstance("RSA")
     keyGenerator.initialize(CA_KEY_SIZE)
 
     return keyGenerator.genKeyPair()
@@ -183,7 +183,7 @@ fun generateCSR(
 ): PKCS10CertificationRequest {
     val csrBuilder: PKCS10CertificationRequestBuilder =
         JcaPKCS10CertificationRequestBuilder(X500Principal("CN=$CN, OU=$OU, O=$O, L=$L, S=$S, C=$C"), pair.public)
-    val csBuilder = JcaContentSignerBuilder("SHA256withECDSA")
+    val csBuilder = JcaContentSignerBuilder("SHA256withRSA")
 
     return csrBuilder.build(csBuilder.build(pair.private))
 }
@@ -197,10 +197,10 @@ fun signCSR(csr: PKCS10CertificationRequest, signing: PrivateKey): X509Certifica
         csr.subject,
         csr.subjectPublicKeyInfo
     )
-    val sigAlg: AlgorithmIdentifier = DefaultSignatureAlgorithmIdentifierFinder().find("SHA256withECDSA")
+    val sigAlg: AlgorithmIdentifier = DefaultSignatureAlgorithmIdentifierFinder().find("SHA256withRSA")
     val digAlg: AlgorithmIdentifier = DefaultDigestAlgorithmIdentifierFinder().find(sigAlg)
     val key: AsymmetricKeyParameter = PrivateKeyFactory.createKey(signing.encoded)
-    val signer: ContentSigner = BcECContentSignerBuilder(sigAlg, digAlg).build(key)
+    val signer: ContentSigner = BcRSAContentSignerBuilder(sigAlg, digAlg).build(key)
 
     val certFactory: CertificateFactory = try {
         CertificateFactory.getInstance("X.509", "BC")
