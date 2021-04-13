@@ -79,8 +79,7 @@ class UserService : LocationProofGrpcKt.LocationProofCoroutineImplBase() {
             }
 
             // Check if user is near
-            if (!info.position.isNear(info.board.getUserCoords(request.id))) {
-                //println("User not near")
+            if (!info.position.isNear(info.board.getUserCoords(request.id)) || info.users.contains(request.id)) {
                 throw StatusRuntimeException(Status.FAILED_PRECONDITION)
             }
         }
@@ -93,6 +92,8 @@ class UserService : LocationProofGrpcKt.LocationProofCoroutineImplBase() {
         return if (Database.id == request.id) {
             User.LocationProofResponse.getDefaultInstance()
         } else {
+            info.users.add(request.id)
+
             User.LocationProofResponse.newBuilder().apply {
                 requesterId = request.id
                 epoch = info.epoch

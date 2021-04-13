@@ -38,7 +38,7 @@ class MasterService(private val serverChannel: ManagedChannel, private val mutex
         request.cellsList.stream()
             .forEach { board.addUser(UserInfo(it.userId, Coordinates(it.x, it.y))) }
 
-        val info = EpochInfo(board.getUserCoords(Database.id), request.epoch, board)
+        val info = EpochInfo(board.getUserCoords(Database.id), request.epoch, board, mutableSetOf())
 
         mutex.withLock {
             Database.epochs.put(request.epoch, info)
@@ -421,7 +421,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
 }
 
 const val SYM_NONCE_LEN = 12
-const val SYM_KEY_SIZE = 32
+const val SYM_KEY_SIZE = 256
 
 fun generateKey(): SecretKey {
     val generator: KeyGenerator = KeyGenerator.getInstance("ChaCha20")
