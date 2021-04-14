@@ -53,16 +53,23 @@ class ReportValidationService(private val keyStore: KeyStore) {
         epoch: Int,
         proofs: List<Proof>
     ): Boolean {
+        val provers: MutableSet<Int> = mutableSetOf()
         proofs.forEach { proof ->
+            // FIXME: Just ignore this signature and move on?
             if (validateSignature(proof.requester, proof.prover, proof.epoch, proof.signature)) {
                 if (user != proof.requester ||
                     user == proof.prover ||
-                    epoch != proof.epoch
+                    epoch != proof.epoch ||
+                    provers.contains(proof.prover)
                 ) {
                     println("Invalid proof for user $user sent by user ${proof.prover} on epoch $epoch")
                     return false
                 }
-            } else return false
+
+                provers.add(proof.prover)
+            } else {
+                return false
+            }
         }
         return true
     }
