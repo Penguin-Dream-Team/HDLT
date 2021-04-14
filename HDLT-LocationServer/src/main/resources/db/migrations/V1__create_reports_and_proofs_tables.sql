@@ -3,11 +3,11 @@
  */
 CREATE TABLE reports
 (
-    id      SERIAL PRIMARY KEY,
-    epoch   INT UNSIGNED NOT NULL,
-    user_id INT UNSIGNED NOT NULL,
-    x       INT UNSIGNED NOT NULL,
-    y       INT UNSIGNED NOT NULL
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    epoch   INTEGER UNSIGNED NOT NULL,
+    user_id INTEGER UNSIGNED NOT NULL,
+    x       INTEGER UNSIGNED NOT NULL,
+    y       INTEGER UNSIGNED NOT NULL
 );
 
 /**
@@ -15,9 +15,9 @@ CREATE TABLE reports
  */
 CREATE TABLE proofs
 (
-    id            SERIAL PRIMARY KEY,
-    other_user_id INT UNSIGNED NOT NULL,
-    report_id     INT UNSIGNED NOT NULL,
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    other_user_id INTEGER UNSIGNED NOT NULL,
+    report_id     INTEGER UNSIGNED NOT NULL,
     signature     VARCHAR(64) NOT NULL,
     FOREIGN KEY (report_id) REFERENCES reports (id) ON UPDATE CASCADE ON DELETE CASCADE
 );

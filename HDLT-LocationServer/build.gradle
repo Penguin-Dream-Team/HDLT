@@ -1,6 +1,5 @@
 plugins {
     id("org.flywaydb.flyway") version "7.6.0"
-
     id("nu.studer.jooq") version "5.2.1"
 }
 
@@ -11,13 +10,14 @@ application.mainClass = "sec.hdlt.server.MainKt"
 dependencies {
     implementation project(":protos")
     implementation "org.jooq:jooq:3.14.8"
+    implementation "com.zaxxer:HikariCP:4.0.3"
 
     implementation "org.xerial:sqlite-jdbc:3.34.0"
     jooqGenerator "org.xerial:sqlite-jdbc:3.34.0"
 }
 
 sourceSets {
-    getByName("main").java.srcDirs("src/main/jooqDatabase")
+    main.kotlin.srcDirs = main.java.srcDirs += "src/main/jooqDatabase"
 }
 
 flyway {
@@ -49,7 +49,7 @@ jooq {
                         fluentSetters = true
                     }
                     target {
-                        packageName = "sec.hdlt.server.db"
+                        packageName = "sec.hdlt.server.db.database"
                         directory = "src/main/jooqDatabase"
                     }
                 }
@@ -65,7 +65,6 @@ def migrateTask = task("migrateDb") {
 
 def cleanTask = task("cleanDb") {
     dependsOn(tasks.named("flywayClean"))
-    // TODO ADD JOOQ TASk
 }
 
 def groupName = "Database"

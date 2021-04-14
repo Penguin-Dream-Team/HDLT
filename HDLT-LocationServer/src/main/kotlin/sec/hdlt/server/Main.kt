@@ -1,13 +1,18 @@
 package sec.hdlt.server
 
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
 import io.grpc.ServerBuilder
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.jooq.SQLDialect
+import org.jooq.impl.DefaultConfiguration
 import sec.hdlt.protos.server.LocationGrpcKt
 import sec.hdlt.protos.server.Report
 import sec.hdlt.protos.server.Server
 import sec.hdlt.protos.server.SetupGrpcKt
+import sec.hdlt.server.dao.ReportDAO
 import sec.hdlt.server.data.LocationReport
 import sec.hdlt.server.data.LocationRequest
 import sec.hdlt.server.data.LocationResponse
@@ -33,6 +38,16 @@ fun main() {
     val keyStore = KeyStore.getInstance("jks")
     val keystoreFile: InputStream = object {}.javaClass.getResourceAsStream(KEYSTORE_FILE)
     val reportsDirectory: String = System.getProperty("user.dir") + "/reports/"
+
+    val dbConfig = DefaultConfiguration()
+        .set(SQLDialect.SQLITE)
+        .set(HikariDataSource(HikariConfig().apply {
+            jdbcUrl = "jdbc:sqlite:src/main/resources/db/database.sqlite"
+            maximumPoolSize = 15
+        }))
+    val reportDAO = ReportDAO(dbConfig)
+    reportDAO.hello()
+
     val locationReportService = LocationReportService(reportsDirectory)
     val reportValidationService = ReportValidationService(keyStore)
 
