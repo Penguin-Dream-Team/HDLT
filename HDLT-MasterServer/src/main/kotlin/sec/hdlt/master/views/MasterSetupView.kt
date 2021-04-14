@@ -10,7 +10,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import sec.hdlt.master.*
 import sec.hdlt.master.controllers.SimulatorController
-import sec.hdlt.master.services.Broadcaster
 import sec.hdlt.master.viewmodels.MasterSetupViewModel
 import sec.hdlt.master.viewmodels.doubleOnly
 import sec.hdlt.master.viewmodels.intOnly
@@ -92,7 +91,7 @@ class MasterSetupView : View("MasterView | Setup") {
                                 .forAddress("localhost", SERVER_PORT)
                                 .usePlaintext()
                                 .build()
-                        ).broadcastEpoch(model.epochInterval.value.toInt())
+                        ).broadcastValues(model.f.value, model.fLine.value)
                     }
                 }
             }

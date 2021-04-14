@@ -21,11 +21,12 @@ class LocationReportService {
             }
         }
 
-        fun getLocationReport(userId: Int, epoch: Int): ReportInfo? {
+        fun getLocationReport(userId: Int, epoch: Int, fLine: Int): ReportInfo? {
             return try {
                 validateLocationReport(
                     Database.reportDAO.getUserLocationReport(userId, epoch),
-                    Database.reportDAO.getEpochReports(epoch)
+                    Database.reportDAO.getEpochReports(epoch),
+                    fLine
                 )
             } catch (ex: HDLTException) {
                 logger.error(ex.message)
@@ -33,30 +34,31 @@ class LocationReportService {
             }
         }
 
-        private fun validateLocationReport(report: LocationReport, reports: List<LocationReport>): ReportInfo? {
+        private fun validateLocationReport(report: LocationReport, reports: List<LocationReport>, fLine: Int): ReportInfo? {
+            var rightUsers = 0
+
             report.proofs.forEach { proof ->
                 val prooferCoordinates = getProoferCoordinates(reports, proof.prover)
 
                 if (prooferCoordinates != null && !report.location.isNear(prooferCoordinates)) {
                     logger.error("BUSTED - User ${report.id} is not close to user ${proof.prover} on epoch ${report.epoch}")
                     return null
+                } else {
+                    rightUsers++
                 }
             }
 
+            val quorum = rightUsers - fLine
             return ReportInfo(
                 id = report.id,
                 epoch = report.epoch,
-                coordinates = report.location
+                coordinates = report.location,
+                serverInfo = when {
+                    quorum > fLine -> "Report validated by a quorum of good users"
+                    quorum > 0 -> "Report validated by at least $quorum good users"
+                    else -> "Can not ensure the quality of the report. Not enough proofs"
+                }
             )
-        }
-
-        private fun validateLocationReports(epoch: Int) {
-            val reports = Database.reportDAO.getEpochReports(epoch)
-
-            reports.forEach { report ->
-                validateLocationReport(report, reports)
-            }
-
         }
 
         private fun getProoferCoordinates(reports: List<LocationReport>, prooferId: Int): Coordinates? {

@@ -32,12 +32,13 @@ class SetupService(private val channel: ManagedChannel) : Closeable {
     private val logger = LoggerFactory.getLogger("SetupService")
     private val stub = SetupGrpcKt.SetupCoroutineStub(channel)
 
-    suspend fun broadcastEpoch(epochh: Int) {
-        val request = Server.BroadcastEpochRequest.newBuilder().apply {
-            this.epoch = epochh
+    suspend fun broadcastValues(f: Int, fLine: Int) {
+        val request = Server.BroadcastValuesRequest.newBuilder().apply {
+            this.f = f
+            this.fLine = fLine
         }
 
-        val response = stub.broadcastEpoch(request.build())
+        val response = stub.broadcastValues(request.build())
         logger.info("Received ${response.ok} from server")
     }
 

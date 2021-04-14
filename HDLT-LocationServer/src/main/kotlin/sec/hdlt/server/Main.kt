@@ -28,7 +28,8 @@ const val KEY_SERVER_ALIAS = "hdlt_server"
 const val KEY_SERVER_PASS = "123"
 const val KEYSTORE_FILE = "/server.jks"
 const val KEYSTORE_PASS = "KeyStoreServer"
-var EPOCH_INTERVAL = 0L
+var F = 0
+var FLINE = 0
 
 fun initDatabaseDaos(): ReportDAO {
     val dbConfig = DefaultConfiguration()
@@ -72,10 +73,11 @@ fun main() {
 }
 
 class Setup : SetupGrpcKt.SetupCoroutineImplBase() {
-    override suspend fun broadcastEpoch(request: Server.BroadcastEpochRequest): Server.BroadcastEpochResponse {
-        EPOCH_INTERVAL = request.epoch.toLong()
+    override suspend fun broadcastValues(request: Server.BroadcastValuesRequest): Server.BroadcastValuesResponse {
+        F = request.f
+        FLINE = request.fLine
 
-        return Server.BroadcastEpochResponse.newBuilder().apply {
+        return Server.BroadcastValuesResponse.newBuilder().apply {
             ok = true
         }.build()
     }
@@ -120,7 +122,7 @@ class Location(
         }
 
         usedNonces.add(decipheredNonce)
-        val locationReport = LocationReportService.getLocationReport(user, epoch)
+        val locationReport = LocationReportService.getLocationReport(user, epoch, F)
         return if (locationReport != null) {
             Report.UserLocationReportResponse.newBuilder().apply {
                 val messageNonce = generateNonce()
@@ -133,7 +135,11 @@ class Location(
                             locationReport.id,
                             locationReport.epoch,
                             locationReport.coordinates,
-                            sign(Database.key, "${locationReport.id}${locationReport.epoch}${locationReport.coordinates}")
+                            locationReport.serverInfo,
+                            sign(
+                                Database.key,
+                                "${locationReport.id}${locationReport.epoch}${locationReport.coordinates}${locationReport.serverInfo}"
+                            )
                         )
                     ),
                     messageNonce
@@ -160,7 +166,7 @@ class HA(val usedNonces: MutableSet<ByteArray>) : HAGrpcKt.HACoroutineImplBase()
         }
 
         usedNonces.add(decipheredNonce)
-        val locationReport = LocationReportService.getLocationReport(user, epoch)
+        val locationReport = LocationReportService.getLocationReport(user, epoch, FLINE)
         return if (locationReport != null) {
             Report.UserLocationReportResponse.newBuilder().apply {
                 val messageNonce = generateNonce()
@@ -173,9 +179,10 @@ class HA(val usedNonces: MutableSet<ByteArray>) : HAGrpcKt.HACoroutineImplBase()
                             locationReport.id,
                             locationReport.epoch,
                             locationReport.coordinates,
+                            locationReport.serverInfo,
                             sign(
                                 Database.key,
-                                "${locationReport.id}${locationReport.epoch}${locationReport.coordinates}"
+                                "${locationReport.id}${locationReport.epoch}${locationReport.coordinates}${locationReport.serverInfo}"
                             )
                         )
                     ),

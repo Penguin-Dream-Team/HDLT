@@ -4,4 +4,5 @@ data class ReportInfo (
     val id: Int,
     val epoch: Int,
     val coordinates: Coordinates,
+    val serverInfo: String
 )

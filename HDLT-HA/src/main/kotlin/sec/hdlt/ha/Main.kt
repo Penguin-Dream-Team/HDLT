@@ -179,8 +179,10 @@ suspend fun main(args: Array<String>) {
                 }
 
                 val location: LocationResponse = responseToLocation(secret, response.nonce, response.ciphertext)
-                if (verifySignature(serverCert, "$coords$epoch${location.users.joinToString { "$it," }}", location.signature)) {
+                if (verifySignature(serverCert, "$coords$epoch${location.users.joinToString { "$it," }}${location.serverInfo}", location.signature)) {
                     println("Users found at ${location.coords} in epoch $epoch")
+                    println("Server Info: ${location.serverInfo}")
+
                     for (user in location.users) {
                         println(user)
                     }

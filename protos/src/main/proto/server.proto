@@ -5,13 +5,14 @@ package sec.hdlt.protos.server;
 option java_package = "sec.hdlt.protos.server";
 
 service Setup {
-  rpc BroadcastEpoch (BroadcastEpochRequest) returns (BroadcastEpochResponse);
+  rpc BroadcastValues (BroadcastValuesRequest) returns (BroadcastValuesResponse);
 }
 
-message BroadcastEpochRequest {
-  int32 epoch = 1;
+message BroadcastValuesRequest {
+  int32 f = 1;
+  int32 fLine = 2;
 }
 
-message BroadcastEpochResponse {
+message BroadcastValuesResponse {
   bool ok = 1;
 }

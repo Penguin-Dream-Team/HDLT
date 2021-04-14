@@ -47,7 +47,8 @@ class ReportDAO(
                         coordinates = Coordinates(
                             x = it[REPORTS.X].toInt(),
                             y = it[REPORTS.Y].toInt()
-                        )
+                        ),
+                        serverInfo = ""
                     )
                 )
             } ?: throw UserReportNotFoundException(userId, epoch)
@@ -64,7 +65,8 @@ class ReportDAO(
                     coordinates = Coordinates(
                         x = it[REPORTS.X].toInt(),
                         y = it[REPORTS.Y].toInt()
-                    )
+                    ),
+                    serverInfo = ""
                 )
             }
         return reports.map { (reportId, report) ->
@@ -111,7 +113,8 @@ class ReportDAO(
                     coordinates = Coordinates(
                         x = it[REPORTS.X].toInt(),
                         y = it[REPORTS.Y].toInt()
-                    )
+                    ),
+                    serverInfo = ""
                 )
             } ?: throw UserReportNotFoundException(userId, epoch)
     }
