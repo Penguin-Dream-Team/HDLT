@@ -22,7 +22,9 @@ class SimulatorController : Controller() {
             model.colCount.value,
             model.rowCount.value,
             model.userCount.value,
-            model.epochInterval.value
+            model.epochInterval.value,
+            model.f.value,
+            model.fLine.value
         ).apply {
             onStep = {
                 fire(GridUpdateRequest)

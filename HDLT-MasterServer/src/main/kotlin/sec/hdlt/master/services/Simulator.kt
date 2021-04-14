@@ -12,6 +12,8 @@ class Simulator(
     cols: Int,
     private val userCount: Int,
     private val epochInterval: Double,
+    private val f: Int,
+    private val fLine: Int,
 ) {
     val grid: Grid = Grid(rows, cols)
     private val broadcaster: Broadcaster = Broadcaster(userCount)

@@ -3,10 +3,7 @@ package sec.hdlt.master.viewmodels
 import javafx.beans.property.SimpleDoubleProperty
 import javafx.beans.property.SimpleIntegerProperty
 import javafx.scene.control.TextField
-import sec.hdlt.master.COL_COUNT
-import sec.hdlt.master.EPOCH_INTERVAL
-import sec.hdlt.master.ROW_COUNT
-import sec.hdlt.master.USER_COUNT
+import sec.hdlt.master.*
 import tornadofx.*
 
 class MasterSetup {
@@ -14,6 +11,8 @@ class MasterSetup {
     val colCountProperty = SimpleIntegerProperty(COL_COUNT)
     val rowCountProperty = SimpleIntegerProperty(ROW_COUNT)
     val epochIntervalProperty = SimpleDoubleProperty(EPOCH_INTERVAL)
+    val fProperty = SimpleIntegerProperty(F)
+    val fLineProperty = SimpleIntegerProperty(F_LINE)
 }
 
 class MasterSetupViewModel : ItemViewModel<MasterSetup>() {
@@ -21,6 +20,8 @@ class MasterSetupViewModel : ItemViewModel<MasterSetup>() {
     val colCount = bind(MasterSetup::colCountProperty)
     val rowCount = bind(MasterSetup::rowCountProperty)
     val epochInterval = bind(MasterSetup::epochIntervalProperty)
+    val f = bind(MasterSetup::fProperty)
+    val fLine = bind(MasterSetup::fLineProperty)
 }
 
 fun TextField.intOnly() {

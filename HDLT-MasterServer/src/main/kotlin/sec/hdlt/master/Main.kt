@@ -19,6 +19,8 @@ const val ROW_COUNT = 10
 const val COL_COUNT = 10
 const val USER_COUNT = 10
 const val EPOCH_INTERVAL = 0.5
+const val F = 3
+const val F_LINE = 2
 const val SERVER_PORT = 7777
 
 fun main() {

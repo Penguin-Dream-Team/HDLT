@@ -2,6 +2,7 @@ package sec.hdlt.master.views
 
 import io.grpc.ManagedChannelBuilder
 import javafx.beans.binding.NumberExpressionBase
+import javafx.beans.property.SimpleIntegerProperty
 import javafx.scene.control.ButtonBar
 import javafx.util.Duration
 import kotlinx.coroutines.CoroutineScope
@@ -27,6 +28,17 @@ class MasterSetupView : View("MasterView | Setup") {
         return null
     }
 
+    private fun ValidationContext.validateF(field: String?, value: SimpleIntegerProperty, maxValue: SimpleIntegerProperty, name: String): ValidationMessage? {
+        return if (field.isNullOrBlank() || value < 0) {
+            error("$name cannot be negative")
+        }
+        else if (value >= maxValue && value.value != 0) {
+            error("$name has to be less than F")
+        } else {
+            null
+        }
+    }
+
     override val root = borderpane {
         center = form {
             fieldset {
@@ -50,12 +62,22 @@ class MasterSetupView : View("MasterView | Setup") {
                         validate(it, model.epochInterval, "The interval needs to be positive")
                     }
                 }
+                field("F") {
+                    textfield(model.f) { intOnly() }.validator {
+                        validateF(it, model.f, model.userCount, "F")
+                    }
+                }
+                field("F'") {
+                    textfield(model.fLine) { intOnly() }.validator {
+                        validateF(it, model.fLine, model.f, "F'")
+                    }
+                }
             }
         }
 
         bottom = buttonbar {
             button("Finish setup", type = ButtonBar.ButtonData.FINISH) {
-                enableWhen(model.userCount.greaterThan(0))
+                enableWhen(model.valid)
                 action {
                     simulatorController.setupSimulator(model)
                     replaceWith<MasterView>(
