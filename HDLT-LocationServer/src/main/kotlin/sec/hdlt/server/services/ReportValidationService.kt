@@ -1,7 +1,10 @@
 package sec.hdlt.server.services
 
 import sec.hdlt.server.KEY_USER_PREFIX
+import sec.hdlt.server.data.Coordinates
 import sec.hdlt.server.data.Proof
+import sec.hdlt.server.verifySignature
+import java.lang.NullPointerException
 import java.security.KeyStore
 import java.security.Signature
 import java.security.SignatureException
@@ -12,14 +15,46 @@ class ReportValidationService(private val keyStore: KeyStore) {
     fun validateSignature(
         user: Int,
         epoch: Int,
+        position: Coordinates,
         sig: String
     ): Boolean {
         return try {
-            val signature: Signature = Signature.getInstance("SHA256withRSA")
-            signature.initVerify(keyStore.getCertificate(KEY_USER_PREFIX + user))
-            signature.update("${user}${epoch}".toByteArray())
-            signature.verify(Base64.getDecoder().decode(sig))
-            true
+            verifySignature(keyStore.getCertificate(KEY_USER_PREFIX + user), "${user}${epoch}${position}", sig)
+        } catch (e: SignatureException) {
+            println("Invalid signature detected for user $user")
+            false
+
+        } catch (e: IllegalArgumentException) {
+            println("Invalid base64 detected for user $user")
+            false
+        }
+    }
+
+    fun validateSignature(
+        user: Int,
+        epoch: Int,
+        sig: String
+    ): Boolean {
+        return try {
+            verifySignature(keyStore.getCertificate(KEY_USER_PREFIX + user), "${user}${epoch}", sig)
+        } catch (e: SignatureException) {
+            println("Invalid signature detected for user $user")
+            false
+
+        } catch (e: IllegalArgumentException) {
+            println("Invalid base64 detected for user $user")
+            false
+        }
+    }
+
+    fun validateSignature(
+        user: Int,
+        prover: Int,
+        epoch: Int,
+        sig: String
+    ): Boolean {
+        return try {
+            verifySignature(keyStore.getCertificate(KEY_USER_PREFIX + prover), "${user}${prover}${epoch}", sig)
         } catch (e: SignatureException) {
             println("Invalid signature detected for user $user")
             false
@@ -36,7 +71,7 @@ class ReportValidationService(private val keyStore: KeyStore) {
         proofs: List<Proof>
     ): Boolean {
         proofs.forEach { proof ->
-            if (validateSignature(proof.prover, proof.epoch, proof.signature)) {
+            if (validateSignature(proof.requester, proof.prover, proof.epoch, proof.signature)) {
                 if (user != proof.requester ||
                     user == proof.prover ||
                     epoch != proof.epoch

@@ -9,11 +9,6 @@ service Location {
   rpc UserLocationReport (UserLocationReportRequest) returns (UserLocationReportResponse);
 }
 
-message Coordinates {
-  int32 x = 1;
-  int32 y = 2;
-}
-
 message ReportRequest {
   // All fields are base64-encoded
   string key = 1; // Ciphered with server's public key
@@ -26,13 +21,14 @@ message ReportResponse {
 }
 
 message UserLocationReportRequest {
-  int32 user = 1;
-  int32 epoch = 2;
-  string sig = 3;
+  // All fields are base64-encoded
+  string key = 1; // Ciphered with server's public key
+  string nonce = 2;
+  string ciphertext = 3;
 }
 
 message UserLocationReportResponse {
-  int32 user = 1;
-  int32 epoch = 2;
-  Coordinates location = 3;
+  // All fields are base64-encoded
+  string nonce = 1;
+  string ciphertext = 2;
 }

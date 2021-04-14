@@ -8,9 +8,7 @@ import sec.hdlt.protos.user.LocationProofGrpcKt
 import sec.hdlt.protos.user.User
 import sec.hdlt.user.*
 import sec.hdlt.user.domain.Database
-import java.security.Signature
 import java.security.SignatureException
-import java.util.*
 import kotlin.random.Random
 
 const val WAIT_TIME: Long = MAX_GRPC_TIME * 100
@@ -56,17 +54,12 @@ class UserService : LocationProofGrpcKt.LocationProofCoroutineImplBase() {
             return stub.requestLocationProof(request)
         }
 
-        // Check signature
-        var sig: Signature = Signature.getInstance("SHA256withRSA")
-
         // Byzantine Level 5: No verification of data
         if (Database.byzantineLevel >= 5 && Random.nextInt(100) < BYZ_PROB_NO_VER) {
             // Skip verification
         } else {
             try {
-                sig.initVerify(Database.keyStore.getCertificate(KEY_ALIAS_PREFIX + request.id))
-                sig.update("${request.id}${request.epoch}".toByteArray())
-                if (!sig.verify(Base64.getDecoder().decode(request.signature))) {
+                if (!verifySignature(Database.keyStore.getCertificate(KEY_ALIAS_PREFIX + request.id), "${request.id}${request.epoch}", request.signature)) {
                     println("INVALID SIGNATURE DETECTED")
                     throw StatusRuntimeException(Status.CANCELLED)
                 }
@@ -84,11 +77,6 @@ class UserService : LocationProofGrpcKt.LocationProofCoroutineImplBase() {
             }
         }
 
-        // Send response with new signature
-        sig = Signature.getInstance("SHA256withRSA")
-        sig.initSign(Database.key)
-        sig.update("${request.id}${Database.id}${info.epoch}".toByteArray())
-
         return if (Database.id == request.id) {
             User.LocationProofResponse.getDefaultInstance()
         } else {
@@ -98,8 +86,10 @@ class UserService : LocationProofGrpcKt.LocationProofCoroutineImplBase() {
                 requesterId = request.id
                 epoch = info.epoch
                 proverId = Database.id
+
+                // Send response with new signature
                 signature = try {
-                    Base64.getEncoder().encodeToString(sig.sign())
+                    sign(Database.key, "${request.id}${Database.id}${info.epoch}")
                 } catch (e: SignatureException) {
                     println("Couldn't sign message")
                     throw StatusRuntimeException(Status.UNAVAILABLE)

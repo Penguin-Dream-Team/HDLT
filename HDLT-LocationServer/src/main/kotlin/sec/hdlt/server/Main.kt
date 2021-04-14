@@ -2,13 +2,15 @@ package sec.hdlt.server
 
 import io.grpc.ServerBuilder
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import sec.hdlt.protos.server.LocationGrpcKt
 import sec.hdlt.protos.server.Report
 import sec.hdlt.protos.server.Server
 import sec.hdlt.protos.server.SetupGrpcKt
-import sec.hdlt.server.data.Coordinates
 import sec.hdlt.server.data.LocationReport
+import sec.hdlt.server.data.LocationRequest
+import sec.hdlt.server.data.LocationResponse
 import sec.hdlt.server.services.LocationReportService
 import sec.hdlt.server.services.ReportValidationService
 import java.io.IOException
@@ -17,10 +19,7 @@ import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.cert.CertificateException
 import java.util.*
-import javax.crypto.Cipher
 import javax.crypto.SecretKey
-import javax.crypto.spec.IvParameterSpec
-import javax.crypto.spec.SecretKeySpec
 
 const val KEY_USER_PREFIX = "cert_hdlt_user_"
 const val KEY_SERVER_ALIAS = "hdlt_server"
@@ -37,7 +36,6 @@ fun main() {
     val locationReportService = LocationReportService(reportsDirectory)
     val reportValidationService = ReportValidationService(keyStore)
 
-    locationReportService.clearOldReports()
     try {
         keyStore.load(keystoreFile, KEYSTORE_PASS.toCharArray())
     } catch (e: IOException) {
@@ -75,14 +73,14 @@ class Location(
     private val key: PrivateKey,
 ) : LocationGrpcKt.LocationCoroutineImplBase() {
     override suspend fun locationReport(request: Report.ReportRequest): Report.ReportResponse {
-        val report: LocationReport = requestToReport(key, request.nonce, request.key, request.ciphertext)
+        val report: LocationReport = requestToLocationReport(key, request.nonce, request.key, request.ciphertext)
         val user = report.id
         val epoch = report.epoch
         val coordinates = report.location
         val sig = report.signature
         val proofs = report.proofs
 
-        return if (!reportValidationService.validateSignature(user, epoch, sig) ||
+        return if (!reportValidationService.validateSignature(user, epoch, coordinates, sig) ||
             !reportValidationService.validateRequest(user, epoch, proofs)
         ) {
             Report.ReportResponse.newBuilder().apply {
@@ -97,57 +95,46 @@ class Location(
     }
 
     override suspend fun userLocationReport(request: Report.UserLocationReportRequest): Report.UserLocationReportResponse {
-        val user = request.user
-        val epoch = request.epoch
-        val sig = request.sig
+        val symKey: SecretKey = asymmetricDecipher(key, request.key)
+        val locationRequest: LocationRequest = requestToLocationRequest(symKey, request.nonce, request.ciphertext)
+        val user = locationRequest.id
+        val epoch = locationRequest.epoch
+        val sig = locationRequest.signature
 
         if (!reportValidationService.validateSignature(user, epoch, sig)) {
-            return Report.UserLocationReportResponse.newBuilder().apply {
-                this.user = user
-                this.epoch = epoch
-                this.location = null
-            }.build()
+            return Report.UserLocationReportResponse.getDefaultInstance()
         }
 
         val locationReport = locationReportService.getLocationReport(user.toLong(), epoch)
-        return Report.UserLocationReportResponse.newBuilder().apply {
-            if (locationReport != null) {
-                val coordinates = Report.Coordinates.newBuilder().apply {
-                    x = locationReport.coordinates.x
-                    y = locationReport.coordinates.y
-                }.build()
+        return if (locationReport != null) {
+            Report.UserLocationReportResponse.newBuilder().apply {
+                val messageNonce = generateNonce()
+                nonce = Base64.getEncoder().encodeToString(messageNonce)
 
-                this.user = locationReport.id
-                this.epoch = locationReport.epoch
-                this.location = coordinates
-            }
-        }.build()
+                ciphertext = symmetricCipher(
+                    symKey,
+                    Json.encodeToString(
+                        LocationResponse(
+                            locationReport.id,
+                            locationReport.epoch,
+                            locationReport.coordinates,
+                            sign(key, "${locationReport.id}${locationReport.epoch}${locationReport.coordinates}")
+                        )
+                    ),
+                    messageNonce
+                )
+            }.build()
+        } else {
+            Report.UserLocationReportResponse.getDefaultInstance()
+        }
     }
 }
 
-const val SYM_KEY_SIZE = 32
-
-fun requestToReport(key: PrivateKey, nonce: String, encodedKey: String, ciphertext: String): LocationReport {
+fun requestToLocationReport(key: PrivateKey, nonce: String, encodedKey: String, ciphertext: String): LocationReport {
     val symKey: SecretKey = asymmetricDecipher(key, encodedKey)
-    val decodedNonce: ByteArray = Base64.getDecoder().decode(nonce)
-    val deciphered = symmetricDecipher(symKey, decodedNonce, ciphertext)
-    return Json.decodeFromString(deciphered)
+    return Json.decodeFromString(symmetricDecipher(symKey, Base64.getDecoder().decode(nonce), ciphertext))
 }
 
-fun asymmetricDecipher(key: PrivateKey, ciphertext: String): SecretKey {
-    val cipher: Cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding")
-    cipher.init(Cipher.DECRYPT_MODE, key)
-
-    val encodedKey = cipher.doFinal(Base64.getDecoder().decode(ciphertext))
-    val decodedKey = Base64.getDecoder().decode(encodedKey)
-    val secret = SecretKeySpec(decodedKey, 0, SYM_KEY_SIZE, "ChaCha20-Poly1305")
-    return secret
-}
-
-fun symmetricDecipher(key: SecretKey, nonce: ByteArray, ciphertext: String): String {
-    val cipher: Cipher = Cipher.getInstance("ChaCha20-Poly1305")
-    val iv = IvParameterSpec(nonce)
-    cipher.init(Cipher.DECRYPT_MODE, key, iv)
-
-    return String(cipher.doFinal(Base64.getDecoder().decode(ciphertext)))
+fun requestToLocationRequest(key: SecretKey, nonce: String, ciphertext: String): LocationRequest {
+    return Json.decodeFromString(symmetricDecipher(key, Base64.getDecoder().decode(nonce), ciphertext))
 }

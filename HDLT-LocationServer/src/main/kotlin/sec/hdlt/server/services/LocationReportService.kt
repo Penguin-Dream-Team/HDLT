@@ -60,7 +60,7 @@ class LocationReportService(directory: String) {
     }
 
     fun getLocationReport(userId: Long, epoch: Int): ReportInfo? {
-        if (byzantineUsers[userId]!!) {
+        if (byzantineUsers[userId] != null) {
             return null
         }
 
@@ -69,7 +69,8 @@ class LocationReportService(directory: String) {
             file.readLines().forEach {
                 val words = it.split(" ")
                 if (words[0] == userId.toString()) {
-                    val coordinates = Coordinates(words[1].toInt(), words[2].toInt())
+                    val protoCoords = words[1].split(",")
+                    val coordinates = Coordinates(protoCoords[0].drop(1).toInt(), protoCoords[1].dropLast(1).toInt())
                     return ReportInfo(userId.toInt(), epoch, coordinates)
                 }
             }

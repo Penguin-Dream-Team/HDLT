@@ -13,16 +13,9 @@ import sec.hdlt.protos.server.*
 import sec.hdlt.protos.user.*
 import sec.hdlt.user.*
 import sec.hdlt.user.domain.*
-import java.security.PublicKey
-import java.security.SecureRandom
-import java.security.Signature
 import java.security.SignatureException
 import java.util.*
 import java.util.concurrent.TimeUnit
-import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
-import javax.crypto.spec.IvParameterSpec
 import kotlin.random.Random
 import kotlin.streams.toList
 
@@ -84,10 +77,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
             Base64.getEncoder().encodeToString(Random.nextBytes(BYZ_BYTES_TAMPER))
         } else {
             try {
-                val sig: Signature = Signature.getInstance("SHA256withRSA")
-                sig.initSign(Database.key)
-                sig.update("${Database.id}${info.epoch}".toByteArray())
-                Base64.getEncoder().encodeToString(sig.sign())
+                sign(Database.key, "${Database.id}${info.epoch}")
             } catch (e: SignatureException) {
                 println("Couldn't sign message")
                 return
@@ -179,10 +169,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
 
                     // Check signature
                     try {
-                        val sig: Signature = Signature.getInstance("SHA256withRSA")
-                        sig.initVerify(Database.keyStore.getCertificate(KEY_ALIAS_PREFIX + user.id))
-                        sig.update("${Database.id}${user.id}${info.epoch}".toByteArray())
-                        if (!sig.verify(Base64.getDecoder().decode(response.signature))) {
+                        if (!verifySignature(Database.keyStore.getCertificate(KEY_ALIAS_PREFIX + user.id), "${Database.id}${user.id}${info.epoch}", response.signature)) {
                             println("Invalid signature detected")
                             userChannel.shutdownNow()
                             return@launch
@@ -264,10 +251,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 )
             } else {
                 try {
-                    val sig: Signature = Signature.getInstance("SHA256withRSA")
-                    sig.initSign(Database.key)
-                    sig.update("${Database.id}${info.epoch}${info.position}".toByteArray())
-                    Base64.getEncoder().encodeToString(sig.sign())
+                    sign(Database.key, "${Database.id}${info.epoch}${info.position}")
                 } catch (e: SignatureException) {
                     println("Couldn't sign message")
                     return
@@ -321,10 +305,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
 
             // Signature
             try {
-                val sig: Signature = Signature.getInstance("SHA256withRSA")
-                sig.initSign(Database.key)
-                sig.update("${Database.id}${info.epoch}${info.position}".toByteArray())
-                Base64.getEncoder().encodeToString(sig.sign())
+                sign(Database.key, "${Database.id}${info.epoch}${info.position}")
             } catch (e: SignatureException) {
                 println("Couldn't sign message")
                 return
@@ -359,7 +340,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
 
         val user = info.board.getRandomUser()
 
-        val report = ReportInfo(
+        val forgedReport = ReportInfo(
             // Id
             Database.id,
 
@@ -371,10 +352,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
 
             // Signature
             try {
-                val sig: Signature = Signature.getInstance("SHA256withRSA")
-                sig.initSign(Database.key)
-                sig.update("${Database.id}${info.epoch}${user.coords}".toByteArray())
-                Base64.getEncoder().encodeToString(sig.sign())
+                sign(Database.key, "${Database.id}${info.epoch}${user.coords}")
             } catch (e: SignatureException) {
                 println("Couldn't sign message")
                 return
@@ -393,10 +371,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
 
                     // Signature
                     try {
-                        val sig: Signature = Signature.getInstance("SHA256withRSA")
-                        sig.initSign(Database.key)
-                        sig.update("${user.id}${Database.id}${info.epoch}".toByteArray())
-                        Base64.getEncoder().encodeToString(sig.sign())
+                        sign(Database.key, "${user.id}${Database.id}${info.epoch}")
                     } catch (e: SignatureException) {
                         println("Couldn't sign message")
                         return
@@ -411,42 +386,11 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 val serverCert = Database.serverCert
                 key = asymmetricCipher(serverCert.publicKey, Base64.getEncoder().encodeToString(secret.encoded))
                 nonce = Base64.getEncoder().encodeToString(messageNonce)
-                ciphertext = symmetricCipher(secret, Json.encodeToString(report), messageNonce)
+                ciphertext = symmetricCipher(secret, Json.encodeToString(forgedReport), messageNonce)
             }.build()).ack) {
             println("Request was OK :O")
         } else {
             println("Dumb user busted")
         }
     }
-}
-
-const val SYM_NONCE_LEN = 12
-const val SYM_KEY_SIZE = 256
-
-fun generateKey(): SecretKey {
-    val generator: KeyGenerator = KeyGenerator.getInstance("ChaCha20")
-    generator.init(SYM_KEY_SIZE, SecureRandom.getInstanceStrong())
-
-    return generator.generateKey()
-}
-
-fun generateNonce(): ByteArray {
-    val nonce = ByteArray(SYM_NONCE_LEN)
-    SecureRandom().nextBytes(nonce)
-    return nonce
-}
-
-fun asymmetricCipher(key: PublicKey, plaintext: String): String {
-    val cipher: Cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding")
-    cipher.init(Cipher.ENCRYPT_MODE, key)
-
-    return Base64.getEncoder().encodeToString(cipher.doFinal(plaintext.toByteArray()))
-}
-
-fun symmetricCipher(key: SecretKey, plaintext: String, nonce: ByteArray): String {
-    val cipher: Cipher = Cipher.getInstance("ChaCha20-Poly1305")
-    val iv = IvParameterSpec(nonce)
-    cipher.init(Cipher.ENCRYPT_MODE, key, iv)
-
-    return Base64.getEncoder().encodeToString(cipher.doFinal(plaintext.toByteArray()))
 }

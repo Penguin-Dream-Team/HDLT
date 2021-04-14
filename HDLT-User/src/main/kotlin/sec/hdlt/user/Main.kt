@@ -2,18 +2,28 @@ package sec.hdlt.user
 
 import io.grpc.ManagedChannelBuilder
 import io.grpc.ServerBuilder
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import sec.hdlt.protos.server.LocationGrpcKt
+import sec.hdlt.protos.server.Report
 import sec.hdlt.user.domain.Database
+import sec.hdlt.user.domain.LocationRequest
+import sec.hdlt.user.domain.LocationResponse
 import sec.hdlt.user.service.MasterService
 import sec.hdlt.user.service.UserService
 import java.io.IOException
 import java.io.InputStream
 import java.security.KeyStore
 import java.security.PrivateKey
-import java.security.PublicKey
+import java.security.SignatureException
 import java.security.cert.Certificate
 import java.security.cert.CertificateException
 import java.security.spec.KeySpec
 import java.util.*
+import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 
@@ -109,6 +119,67 @@ fun main(args: Array<String>) {
         .addService(UserService())
         .build()
 
+    // Allow server queries
+    GlobalScope.launch {
+        val stub = LocationGrpcKt.LocationCoroutineStub(channel)
+
+        while (true) {
+            println("Write request in the form `<epoch> [<user to get>]`")
+            val request = readLine()!!.split(" ")
+            if (request.size > 2 || request.isEmpty()) {
+                println("Invalid syntax")
+                continue
+            }
+
+            val epoch = request[0].toInt()
+
+            try {
+                val secret = generateKey()
+                val response = stub.userLocationReport(Report.UserLocationReportRequest.newBuilder().apply {
+                    val messageNonce = generateNonce()
+                    key = asymmetricCipher(serverCert.publicKey, Base64.getEncoder().encodeToString(secret.encoded))
+                    nonce = Base64.getEncoder().encodeToString(messageNonce)
+
+                    ciphertext = symmetricCipher(
+                        secret, Json.encodeToString(
+                            LocationRequest(
+                                // User Id
+                                if (request.size == 2) {
+                                    request[1].toInt()
+                                } else {
+                                    id
+                                },
+
+                                // Epoch
+                                epoch,
+
+                                // Signature
+                                sign(privKey, "${id}${epoch}")
+                            )
+                        ),
+                        messageNonce
+                    )
+                }.build())
+
+                if (response.nonce.equals("") || response.ciphertext.equals("")) {
+                    println("No location found for epoch $epoch")
+                   continue
+                }
+
+                val report: LocationResponse = responseToLocation(secret, response.nonce, response.ciphertext)
+                if (verifySignature(serverCert, "$id$epoch${report.coords}", report.signature)) {
+                    println("User $id was at ${report.coords} in epoch $epoch")
+                } else {
+                    println("Response was not sent by server")
+                }
+
+            } catch (e: SignatureException) {
+                println("Could not sign message")
+                continue
+            }
+        }
+    }
+
     server.start()
     server.awaitTermination()
 }
@@ -118,4 +189,10 @@ fun deriveKey(password: String): String {
     val factory: SecretKeyFactory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1")
 
     return Base64.getEncoder().encodeToString(factory.generateSecret(spec).encoded)
+}
+
+fun responseToLocation(key: SecretKey, nonce: String, ciphertext: String): LocationResponse {
+    val decodedNonce: ByteArray = Base64.getDecoder().decode(nonce)
+    val deciphered = symmetricDecipher(key, decodedNonce, ciphertext)
+    return Json.decodeFromString(deciphered)
 }
