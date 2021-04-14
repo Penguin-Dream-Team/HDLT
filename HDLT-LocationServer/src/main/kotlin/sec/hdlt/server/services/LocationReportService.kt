@@ -11,16 +11,11 @@ import java.io.FileNotFoundException
 import java.io.FileOutputStream
 
 const val DELAY_TIME = 4
-const val FLAGGED_AMOUNT = 3
-const val WELL_BEHAVED_AMOUNT = 10
 
 @Suppress("RECEIVER_NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
 class LocationReportService(directory: String) {
     private val reportsDirectory: String = directory
     private val logger = LoggerFactory.getLogger("Location")
-    private val byzantineUsers = hashMapOf<Long, Boolean>()
-    private val flaggedUsers = hashMapOf<Long, Int>()          // 3 flags and user becomes byzantine
-    private val wellBehavedUsers = hashMapOf<Long, Int>()      // 10 times well behaved and removes one flag
 
     fun clearOldReports() {
         File(reportsDirectory).listFiles().forEach { file ->
@@ -60,10 +55,6 @@ class LocationReportService(directory: String) {
     }
 
     fun getLocationReport(userId: Long, epoch: Int): ReportInfo? {
-        if (byzantineUsers[userId] != null) {
-            return null
-        }
-
         val file = getFile(reportsDirectory, epoch)
         try {
             file.readLines().forEach {
@@ -92,12 +83,8 @@ class LocationReportService(directory: String) {
                     val userCoordinates = getCoordinates(words[1])
                     for (i in 2 until words.size) {
                         val prooferCoordinates = getProoferCoordinates(reportValidationList, words[i])
-                        if (prooferCoordinates == null) {
-                            flagUser(words[i].toLong(), epoch)
-                        } else if (!userCoordinates.isNear(prooferCoordinates)) {
+                        if (prooferCoordinates != null && !userCoordinates.isNear(prooferCoordinates)) {
                             logger.error("BUSTED - User ${words[0]} is not close to user ${words[i]} on epoch $epoch")
-                        } else {
-                            wellBehavedUser(words[i].toLong())
                         }
                     }
                 }
@@ -113,52 +100,15 @@ class LocationReportService(directory: String) {
     }
 
     private fun getCoordinates(words: String): Coordinates {
-        initUser(words[0].toLong())
         return Coordinates(words[1].toInt(), words[3].toInt())
     }
 
     private fun getProoferCoordinates(reportValidationList: MutableList<String>, prooferId: String): Coordinates? {
-        initUser(prooferId.toLong())
         reportValidationList.forEach {
             val prooferReport = it.split(" ")
             if (prooferReport[0] == prooferId)
                 return getCoordinates(prooferReport[1])
         }
         return null
-    }
-
-    private fun initUser(userId: Long) {
-        if (!byzantineUsers.containsKey(userId)) byzantineUsers[userId] = false
-        if (!flaggedUsers.containsKey(userId)) flaggedUsers[userId] = 0
-        if (!wellBehavedUsers.containsKey(userId)) wellBehavedUsers[userId] = 0
-    }
-
-    private fun flagUser(userId: Long, epoch: Int) {
-        flaggedUsers[userId] = flaggedUsers[userId]!!.plus(1)
-        if (!byzantineUsers[userId]!!)
-            logger.warn("User $userId got flagged by not sending his report on epoch $epoch. Current flags = ${flaggedUsers[userId]}")
-
-        if (flaggedUsers[userId]!! == FLAGGED_AMOUNT) {
-            byzantineUsers[userId] = true
-            wellBehavedUsers[userId] = 0
-            logger.error("BUSTED - User $userId got busted on epoch $epoch")
-        }
-    }
-
-    private fun wellBehavedUser(userId: Long) {
-        if (flaggedUsers[userId]!! > 0) {
-            wellBehavedUsers[userId] = wellBehavedUsers[userId]!!.plus(1)
-
-            if (wellBehavedUsers[userId]!! == WELL_BEHAVED_AMOUNT) {
-                wellBehavedUsers[userId] = 0
-                flaggedUsers[userId] = flaggedUsers[userId]!!.minus(1)
-                logger.info("FIX - User $userId well behaved for $WELL_BEHAVED_AMOUNT epochs. Current flags = ${flaggedUsers[userId]}")
-
-                if (byzantineUsers[userId]!! && flaggedUsers[userId]!! == 0) {
-                    byzantineUsers[userId] = false
-                    logger.info("FIX - User $userId was misbehaved as byzantine")
-                }
-            }
-        }
     }
 }
