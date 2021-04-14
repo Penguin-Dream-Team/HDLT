@@ -35,10 +35,22 @@ class ReportDAO(
         ) != 0
     }
 
+    fun getUsersAtLocation(epoch: Int, coords: Coordinates, create: DSLContext = dslContext): List<Int> {
+        return create.select(REPORTS.USER_ID)
+            .from(REPORTS)
+            .where(REPORTS.EPOCH.eq(epoch))
+            .and(REPORTS.X.eq(coords.x))
+            .and(REPORTS.Y.eq(coords.y))
+            .fetch().map {
+                it[REPORTS.USER_ID].toInt()
+            }.toList()
+    }
+
     fun getUserLocationReport(userId: Int, epoch: Int, create: DSLContext = dslContext): LocationReport {
         return create.select()
             .from(REPORTS)
             .where(REPORTS.EPOCH.eq(epoch))
+            .and(REPORTS.USER_ID.eq(userId))
             .fetchOne()?.map {
                 getUserLocationReport(
                     it[REPORTS.ID], ReportInfo(

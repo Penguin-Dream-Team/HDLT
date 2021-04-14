@@ -34,9 +34,12 @@ class LocationReportService {
             }
         }
 
+        fun getUsersAtLocation(epoch: Int, coords: Coordinates): List<Int> {
+            return Database.reportDAO.getUsersAtLocation(epoch, coords)
+        }
+
         private fun validateLocationReport(report: LocationReport, reports: List<LocationReport>, fLine: Int): ReportInfo? {
             var rightUsers = 0
-
             report.proofs.forEach { proof ->
                 val prooferCoordinates = getProoferCoordinates(reports, proof.prover)
 

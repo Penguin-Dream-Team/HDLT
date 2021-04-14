@@ -20,7 +20,7 @@ import java.util.*
 import javax.crypto.SecretKey
 
 const val KEYSTORE_FILE = "/ha.jks"
-const val KEYSTORE_PASS = "UL764S3C637P4SSW06D"
+const val KEYSTORE_PASS = "KeyStoreHA"
 const val KEY_PASS = "123"
 const val KEY_ALIAS_HA = "hdlt_ha"
 const val KEY_ALIAS_SERVER = "hdlt_server"
@@ -87,7 +87,7 @@ suspend fun main(args: Array<String>) {
         if (option == 1) {
             println("Asking for report of a user")
             println("Insert <user id> <epoch>")
-            println(">> ")
+            print(">> ")
             val options: List<String> = readLine()!!.split(" ")
 
             if (options.size != 2) {
@@ -140,7 +140,7 @@ suspend fun main(args: Array<String>) {
         } else if (option == 2) {
             println("Asking for users at given location and epoch")
             println("Insert <epoch> <coordinate x> <coordinate y>")
-            println(">> ")
+            print(">> ")
             val options: List<String> = readLine()!!.split(" ")
 
             if (options.size != 3) {
@@ -180,11 +180,15 @@ suspend fun main(args: Array<String>) {
 
                 val location: LocationResponse = responseToLocation(secret, response.nonce, response.ciphertext)
                 if (verifySignature(serverCert, "$coords$epoch${location.users.joinToString { "$it," }}${location.serverInfo}", location.signature)) {
-                    println("Users found at ${location.coords} in epoch $epoch")
-                    println("Server Info: ${location.serverInfo}")
-
-                    for (user in location.users) {
-                        println(user)
+                    if(location.users.isEmpty()) {
+                        println("No users found at coords $coords in epoch $epoch")
+                        println("Server Info: ${location.serverInfo}")
+                    } else {
+                        println("Users found at ${location.coords} in epoch $epoch:")
+                        println("Server Info: ${location.serverInfo}")
+                        for (user in location.users) {
+                            println(user)
+                        }
                     }
                 } else {
                     println("Response was not sent by server")
@@ -195,6 +199,8 @@ suspend fun main(args: Array<String>) {
                 println("Couldn't contact server")
                 continue
             }
+        } else if (option == 3) {
+            break
         } else {
             println("Unknown option")
         }

@@ -1,5 +1,7 @@
 group 'sec.hdlt.ha'
 
+application.mainClass = "sec.hdlt.ha.MainKt"
+
 dependencies {
     implementation project(":protos")
 }

@@ -8,7 +8,7 @@ import sec.hdlt.server.data.Proof
 import sec.hdlt.server.verifySignature
 import java.security.SignatureException
 
-class ReportValidationService {
+class RequestValidationService {
     companion object {
         private fun validateSignatureImpl(user: Int, sig: String, format: String, requester: Int): Boolean {
             return try {
@@ -45,6 +45,14 @@ class ReportValidationService {
             sig: String
         ): Boolean {
             return validateHASignatureImpl("$user$epoch", sig)
+        }
+
+        fun validateHASignature(
+            epoch: Int,
+            coords: Coordinates,
+            sig: String
+        ): Boolean {
+            return validateHASignatureImpl("$coords$epoch", sig)
         }
 
         fun validateSignature(

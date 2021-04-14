@@ -12,7 +12,7 @@ import sec.hdlt.protos.server.*
 import sec.hdlt.server.dao.ReportDAO
 import sec.hdlt.server.data.*
 import sec.hdlt.server.services.LocationReportService
-import sec.hdlt.server.services.ReportValidationService
+import sec.hdlt.server.services.RequestValidationService
 import java.io.IOException
 import java.io.InputStream
 import java.security.KeyStore
@@ -87,15 +87,16 @@ class Location(
     private val usedNonces: MutableSet<ByteArray>
 ) : LocationGrpcKt.LocationCoroutineImplBase() {
     override suspend fun locationReport(request: Report.ReportRequest): Report.ReportResponse {
-        val report: LocationReport = requestToLocationReport(Database.key, request.nonce, request.key, request.ciphertext)
+        val report: LocationReport =
+            requestToLocationReport(Database.key, request.nonce, request.key, request.ciphertext)
         val user = report.id
         val epoch = report.epoch
         val coordinates = report.location
         val sig = report.signature
         val proofs = report.proofs
 
-        return if (!ReportValidationService.validateSignature(user, epoch, coordinates, sig) ||
-            !ReportValidationService.validateRequest(user, epoch, proofs)
+        return if (!RequestValidationService.validateSignature(user, epoch, coordinates, sig) ||
+            !RequestValidationService.validateRequest(user, epoch, proofs)
         ) {
             Report.ReportResponse.newBuilder().apply {
                 ack = false
@@ -117,7 +118,7 @@ class Location(
 
         val decipheredNonce = Base64.getDecoder().decode(request.nonce)
 
-        if (!ReportValidationService.validateSignature(user, epoch, sig) || usedNonces.contains(decipheredNonce)) {
+        if (usedNonces.contains(decipheredNonce) || !RequestValidationService.validateSignature(user, epoch, sig)) {
             return Report.UserLocationReportResponse.getDefaultInstance()
         }
 
@@ -161,7 +162,7 @@ class HA(val usedNonces: MutableSet<ByteArray>) : HAGrpcKt.HACoroutineImplBase()
 
         val decipheredNonce = Base64.getDecoder().decode(request.nonce)
 
-        if (!ReportValidationService.validateHASignature(user, epoch, sig) || usedNonces.contains(decipheredNonce)) {
+        if (usedNonces.contains(decipheredNonce) || !RequestValidationService.validateHASignature(user, epoch, sig)) {
             return Report.UserLocationReportResponse.getDefaultInstance()
         }
 
@@ -197,10 +198,38 @@ class HA(val usedNonces: MutableSet<ByteArray>) : HAGrpcKt.HACoroutineImplBase()
     override suspend fun usersAtCoordinates(request: Report.UsersAtCoordinatesRequest): Report.UsersAtCoordinatesResponse {
         val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
         val usersRequest: CoordinatesRequest = requestToCoordinatesRequest(symKey, request.nonce, request.ciphertext)
+        val epoch = usersRequest.epoch
+        val coordinates = usersRequest.coords
+        val signature = usersRequest.signature
 
         val decipheredNonce = Base64.getDecoder().decode(request.nonce)
+        if (usedNonces.contains(decipheredNonce) || !RequestValidationService.validateHASignature(
+                epoch,
+                coordinates,
+                signature
+            )
+        ) {
+            return Report.UsersAtCoordinatesResponse.getDefaultInstance()
+        }
 
-        return Report.UsersAtCoordinatesResponse.getDefaultInstance()
+        val users = LocationReportService.getUsersAtLocation(epoch, coordinates)
+
+        return Report.UsersAtCoordinatesResponse.newBuilder().apply {
+            val messageNonce = generateNonce()
+            nonce = Base64.getEncoder().encodeToString(messageNonce)
+
+            ciphertext = symmetricCipher(
+                symKey,
+                Json.encodeToString(
+                    CoordinatesResponse(
+                        users,
+                        coordinates,
+                        epoch,
+                        sign(Database.key, "$coordinates$epoch${users.joinToString { "$it," }}")
+                    )
+                ), messageNonce
+            )
+        }.build()
     }
 }
 

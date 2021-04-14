@@ -1,4 +1,6 @@
 package sec.hdlt.server.data
 
-class CoordinatesRequest {
-}
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class CoordinatesRequest(val coords: Coordinates, val epoch: Int, val signature: String)
