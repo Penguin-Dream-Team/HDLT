@@ -8,7 +8,7 @@ The server uses a database connection to the reports database.
 
 ### Migrate Database Schema Files
 
-The API is using [flyway](https://flyway.org/) to migrate the database schemas. This will allow the application to
+The server is using [flyway](https://flyway.org/) to migrate the database schemas. This will allow the application to
 automatically create the tables and populate them accordingly. The files for the migrations can be found in
 the `resources/db/migrations/` folder and need to be prepended with the version in the format
 of `V{#}__migration_name.sql`. To migrate the files to the database, you can use the following gradle task:
