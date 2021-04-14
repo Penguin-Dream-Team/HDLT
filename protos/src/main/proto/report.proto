@@ -9,6 +9,11 @@ service Location {
   rpc UserLocationReport (UserLocationReportRequest) returns (UserLocationReportResponse);
 }
 
+service HA {
+  rpc UserLocationReport (UserLocationReportRequest) returns (UserLocationReportResponse);
+  rpc UsersAtCoordinates (UsersAtCoordinatesRequest) returns (UsersAtCoordinatesResponse);
+}
+
 message ReportRequest {
   // All fields are base64-encoded
   string key = 1; // Ciphered with server's public key
@@ -28,6 +33,19 @@ message UserLocationReportRequest {
 }
 
 message UserLocationReportResponse {
+  // All fields are base64-encoded
+  string nonce = 1;
+  string ciphertext = 2;
+}
+
+message UsersAtCoordinatesRequest {
+  // All fields are base64-encoded
+  string key = 1; // Ciphered with server's public key
+  string nonce = 2;
+  string ciphertext = 3;
+}
+
+message UsersAtCoordinatesResponse {
   // All fields are base64-encoded
   string nonce = 1;
   string ciphertext = 2;

@@ -117,10 +117,6 @@ fun main() {
     haKeyStore.setKeyEntry(haAlias, haKP.private, haKeyPass.toCharArray(), haCertificateChain)
     serverKeyStore.setCertificateEntry(haAlias, haCertificate)
 
-    // Save HA KeyStore
-    println("Saving HA KeyStore to file")
-    saveKeyStore(haKeyStore, haKeyStoreFile, haKeyStorePass)
-
     // Generate User Certificates
     println("Generating user keys")
     for (i in 0 until nUsers) {
@@ -132,6 +128,7 @@ fun main() {
         userKeyStore.setKeyEntry(userPrefix + i, userKP.private, userPass.toCharArray(), userCertificateChain)
         userKeyStore.setCertificateEntry("cert_$userPrefix$i", userCertificate)
         serverKeyStore.setCertificateEntry("cert_$userPrefix$i", userCertificate)
+        haKeyStore.setCertificateEntry("cert_$userPrefix$i", userCertificate)
     }
 
     // Save Server KeyStore
@@ -141,6 +138,11 @@ fun main() {
     // Save User KeyStore
     println("Saving User KeyStore to file")
     saveKeyStore(userKeyStore, userKeyStoreFile, userKeyStorePass)
+
+    // Save HA KeyStore
+    println("Saving HA KeyStore to file")
+    saveKeyStore(haKeyStore, haKeyStoreFile, haKeyStorePass)
+
 }
 
 fun initCA() {

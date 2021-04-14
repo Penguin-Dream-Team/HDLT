@@ -125,7 +125,14 @@ fun main(args: Array<String>) {
 
         while (true) {
             println("Write request in the form `<epoch> [<user to get>]`")
-            val request = readLine()!!.split(" ")
+            val request: List<String>
+
+            try {
+                request = readLine()!!.split(" ")
+            } catch (e: NumberFormatException) {
+                continue
+            }
+
             if (request.size > 2 || request.isEmpty()) {
                 println("Invalid syntax")
                 continue
