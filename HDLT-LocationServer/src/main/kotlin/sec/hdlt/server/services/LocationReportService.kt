@@ -1,8 +1,6 @@
 package sec.hdlt.server.services
 
-import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
-import sec.hdlt.server.EPOCH_INTERVAL
 import sec.hdlt.server.dao.ReportDAO
 import sec.hdlt.server.data.Coordinates
 import sec.hdlt.server.data.LocationReport
@@ -10,10 +8,7 @@ import sec.hdlt.server.data.Proof
 import sec.hdlt.server.data.ReportInfo
 import sec.hdlt.server.exceptions.HDLTException
 
-const val DELAY_TIME = 4
-
 class LocationReportService(
-    private val reportsDirectory: String,
     private val reportDao: ReportDAO
 ) {
     private val logger = LoggerFactory.getLogger("Location")
@@ -24,13 +19,6 @@ class LocationReportService(
         coordinates: Coordinates,
         proofs: List<Proof>
     ) {
-        if (!reportDao.epochHasReports(epoch)) {
-            GlobalScope.launch {
-                delay(EPOCH_INTERVAL * DELAY_TIME)
-                validateLocationReports(epoch)
-            }
-        }
-
         try {
             reportDao.saveUserReport(epoch, user, coordinates, proofs)
         } catch (ex: HDLTException) {

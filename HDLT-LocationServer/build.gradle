@@ -67,6 +67,12 @@ def cleanTask = task("cleanDb") {
     dependsOn(tasks.named("flywayClean"))
 }
 
+def resetTask = task("resetDb") {
+    dependsOn(tasks.named("cleanDb"))
+    dependsOn(tasks.named("migrateDb"))
+}
+
 def groupName = "Database"
 migrateTask.group = groupName
 cleanTask.group = groupName
+resetTask.group = groupName

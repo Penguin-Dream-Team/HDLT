@@ -47,11 +47,10 @@ fun main() {
     // Load the keystore
     val keyStore = KeyStore.getInstance("jks")
     val keystoreFile: InputStream = object {}.javaClass.getResourceAsStream(KEYSTORE_FILE)!!
-    val reportsDirectory: String = System.getProperty("user.dir") + "/reports/"
 
     val reportDao = initDatabaseDaos()
 
-    val locationReportService = LocationReportService(reportsDirectory, reportDao)
+    val locationReportService = LocationReportService(reportDao)
     val reportValidationService = ReportValidationService(keyStore)
 
     try {
@@ -75,7 +74,7 @@ fun main() {
     server.awaitTermination()
 }
 
-class Setup() : SetupGrpcKt.SetupCoroutineImplBase() {
+class Setup : SetupGrpcKt.SetupCoroutineImplBase() {
     override suspend fun broadcastEpoch(request: Server.BroadcastEpochRequest): Server.BroadcastEpochResponse {
         EPOCH_INTERVAL = request.epoch.toLong()
 
