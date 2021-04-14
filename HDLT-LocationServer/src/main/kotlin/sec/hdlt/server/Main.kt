@@ -24,6 +24,7 @@ import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.cert.CertificateException
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 import javax.crypto.SecretKey
 
 const val KEY_USER_PREFIX = "cert_hdlt_user_"
@@ -66,7 +67,7 @@ fun main() {
     val serverKey: PrivateKey = keyStore.getKey(KEY_SERVER_ALIAS, KEY_SERVER_PASS.toCharArray()) as PrivateKey
 
     val server = ServerBuilder.forPort(7777).apply {
-        addService(Location(reportValidationService, locationReportService, serverKey))
+        addService(Location(reportValidationService, locationReportService, serverKey, ConcurrentHashMap.newKeySet()))
         addService(Setup())
     }.build()
 
@@ -88,6 +89,7 @@ class Location(
     private val reportValidationService: ReportValidationService,
     private val locationReportService: LocationReportService,
     private val key: PrivateKey,
+    private val usedNonces: MutableSet<ByteArray>
 ) : LocationGrpcKt.LocationCoroutineImplBase() {
     override suspend fun locationReport(request: Report.ReportRequest): Report.ReportResponse {
         val report: LocationReport = requestToLocationReport(key, request.nonce, request.key, request.ciphertext)
@@ -118,10 +120,13 @@ class Location(
         val epoch = locationRequest.epoch
         val sig = locationRequest.signature
 
-        if (!reportValidationService.validateSignature(user, epoch, sig)) {
+        val decipheredNonce = Base64.getDecoder().decode(request.nonce)
+
+        if (!reportValidationService.validateSignature(user, epoch, sig) || usedNonces.contains(decipheredNonce)) {
             return Report.UserLocationReportResponse.getDefaultInstance()
         }
 
+        usedNonces.add(decipheredNonce)
         val locationReport = locationReportService.getLocationReport(user, epoch)
         return if (locationReport != null) {
             Report.UserLocationReportResponse.newBuilder().apply {
