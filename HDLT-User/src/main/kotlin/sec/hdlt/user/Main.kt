@@ -174,7 +174,7 @@ fun main(args: Array<String>) {
                 }
 
                 val report: LocationResponse = responseToLocation(secret, response.nonce, response.ciphertext)
-                if (verifySignature(serverCert, "$id$epoch${report.coords}${report.serverInfo}", report.signature)) {
+                if (verifySignature(serverCert, "$id$epoch${report.coords}${report.serverInfo}${report.proofs.joinToString { "${it.prover}" }}", report.signature)) {
                     println("User $id was at ${report.coords} in epoch $epoch")
                     println("Server Info: ${report.serverInfo}")
                 } else {

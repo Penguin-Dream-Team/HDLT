@@ -124,8 +124,9 @@ suspend fun main(args: Array<String>) {
                 }
 
                 val report: ReportResponse = responseToReport(secret, response.nonce, response.ciphertext)
-                if (verifySignature(serverCert, "$user$epoch${report.coords}", report.signature)) {
+                if (verifySignature(serverCert, "$user$epoch${report.coords}${report.serverInfo}${report.proofs.joinToString { "${it.prover}" }}", report.signature)) {
                     println("User $user was at ${report.coords} in epoch $epoch")
+                    println("Server Info: ${report.serverInfo}")
                 } else {
                     println("Response was not sent by server")
                 }
@@ -165,7 +166,7 @@ suspend fun main(args: Array<String>) {
                     key = asymmetricCipher(serverCert.publicKey, Base64.getEncoder().encodeToString(secret.encoded))
                     nonce = Base64.getEncoder().encodeToString(messageNonce)
                     ciphertext = symmetricCipher(secret, Json.encodeToString(
-                        LocationRequest(
+                        EpochLocationRequest(
                         coords,
                         epoch,
                         sign(privKey, "${coords}${epoch}")
@@ -178,14 +179,12 @@ suspend fun main(args: Array<String>) {
                     continue
                 }
 
-                val location: LocationResponse = responseToLocation(secret, response.nonce, response.ciphertext)
-                if (verifySignature(serverCert, "$coords$epoch${location.users.joinToString { "$it," }}${location.serverInfo}", location.signature)) {
+                val location: EpochLocationResponse = responseToLocation(secret, response.nonce, response.ciphertext)
+                if (verifySignature(serverCert, "$coords$epoch${location.users.joinToString { "$it" }}", location.signature)) {
                     if(location.users.isEmpty()) {
                         println("No users found at coords $coords in epoch $epoch")
-                        println("Server Info: ${location.serverInfo}")
                     } else {
                         println("Users found at ${location.coords} in epoch $epoch:")
-                        println("Server Info: ${location.serverInfo}")
                         for (user in location.users) {
                             println(user)
                         }
@@ -213,7 +212,7 @@ fun responseToReport(key: SecretKey, nonce: String, ciphertext: String): ReportR
     return Json.decodeFromString(deciphered)
 }
 
-fun responseToLocation(key: SecretKey, nonce: String, ciphertext: String): LocationResponse {
+fun responseToLocation(key: SecretKey, nonce: String, ciphertext: String): EpochLocationResponse {
     val decodedNonce: ByteArray = Base64.getDecoder().decode(nonce)
     val deciphered = symmetricDecipher(key, decodedNonce, ciphertext)
     return Json.decodeFromString(deciphered)

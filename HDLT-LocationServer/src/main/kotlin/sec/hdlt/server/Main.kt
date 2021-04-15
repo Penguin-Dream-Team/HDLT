@@ -96,7 +96,10 @@ class Location(
         val proofs = report.proofs
 
         return if (!RequestValidationService.validateSignature(user, epoch, coordinates, sig) ||
-            !RequestValidationService.validateRequest(user, epoch, proofs) || LocationReportService.hasReport(user, epoch)
+            !RequestValidationService.validateRequest(user, epoch, proofs) || LocationReportService.hasReport(
+                user,
+                epoch
+            )
         ) {
             Report.ReportResponse.newBuilder().apply {
                 ack = false
@@ -125,24 +128,18 @@ class Location(
         usedNonces.add(decipheredNonce)
         val locationReport = LocationReportService.getLocationReport(user, epoch, F)
         return if (locationReport != null) {
+            locationReport.signature = sign(
+                Database.key,
+                "${locationReport.id}${locationReport.epoch}${locationReport.coords}${locationReport.serverInfo}${locationReport.proofs.joinToString { "${it.prover}" }}"
+            )
+
             Report.UserLocationReportResponse.newBuilder().apply {
                 val messageNonce = generateNonce()
                 nonce = Base64.getEncoder().encodeToString(messageNonce)
 
                 ciphertext = symmetricCipher(
                     symKey,
-                    Json.encodeToString(
-                        LocationResponse(
-                            locationReport.id,
-                            locationReport.epoch,
-                            locationReport.coordinates,
-                            locationReport.serverInfo,
-                            sign(
-                                Database.key,
-                                "${locationReport.id}${locationReport.epoch}${locationReport.coordinates}${locationReport.serverInfo}"
-                            )
-                        )
-                    ),
+                    Json.encodeToString(locationReport),
                     messageNonce
                 )
             }.build()
@@ -169,24 +166,18 @@ class HA(val usedNonces: MutableSet<ByteArray>) : HAGrpcKt.HACoroutineImplBase()
         usedNonces.add(decipheredNonce)
         val locationReport = LocationReportService.getLocationReport(user, epoch, FLINE)
         return if (locationReport != null) {
+            locationReport.signature = sign(
+                Database.key,
+                "${locationReport.id}${locationReport.epoch}${locationReport.coords}${locationReport.serverInfo}${locationReport.proofs.joinToString { "${it.prover}" }}"
+            )
+
             Report.UserLocationReportResponse.newBuilder().apply {
                 val messageNonce = generateNonce()
                 nonce = Base64.getEncoder().encodeToString(messageNonce)
 
                 ciphertext = symmetricCipher(
                     symKey,
-                    Json.encodeToString(
-                        LocationResponse(
-                            locationReport.id,
-                            locationReport.epoch,
-                            locationReport.coordinates,
-                            locationReport.serverInfo,
-                            sign(
-                                Database.key,
-                                "${locationReport.id}${locationReport.epoch}${locationReport.coordinates}${locationReport.serverInfo}"
-                            )
-                        )
-                    ),
+                    Json.encodeToString(locationReport),
                     messageNonce
                 )
             }.build()
@@ -225,7 +216,7 @@ class HA(val usedNonces: MutableSet<ByteArray>) : HAGrpcKt.HACoroutineImplBase()
                         users,
                         coordinates,
                         epoch,
-                        sign(Database.key, "$coordinates$epoch${users.joinToString { "$it," }}")
+                        sign(Database.key, "$coordinates$epoch${users.joinToString { "$it" }}")
                     )
                 ), messageNonce
             )

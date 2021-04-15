@@ -21,7 +21,7 @@ class LocationReportService {
             }
         }
 
-        fun getLocationReport(userId: Int, epoch: Int, fLine: Int): ReportInfo? {
+        fun getLocationReport(userId: Int, epoch: Int, fLine: Int): LocationResponse? {
             return try {
                 validateLocationReport(
                     Database.reportDAO.getUserLocationReport(userId, epoch),
@@ -42,13 +42,14 @@ class LocationReportService {
             return Database.reportDAO.getUsersAtLocation(epoch, coords)
         }
 
-        private fun validateLocationReport(report: LocationReport, reports: List<LocationReport>, fLine: Int): ReportInfo? {
+        private fun validateLocationReport(report: LocationReport, reports: List<LocationReport>, fLine: Int): LocationResponse? {
             var rightUsers = 0
             report.proofs.forEach { proof ->
                 val prooferCoordinates = getProoferCoordinates(reports, proof.prover)
 
                 if (prooferCoordinates != null && !report.location.isNear(prooferCoordinates)) {
                     logger.error("BUSTED - User ${report.id} is not close to user ${proof.prover} on epoch ${report.epoch}")
+                    // FIXME: Just ignore??
                     return null
                 } else {
                     rightUsers++
@@ -56,15 +57,19 @@ class LocationReportService {
             }
 
             val quorum = rightUsers - fLine
-            return ReportInfo(
+            return LocationResponse(
                 id = report.id,
                 epoch = report.epoch,
-                coordinates = report.location,
+                coords = report.location,
                 serverInfo = when {
                     quorum > fLine -> "Report validated by a quorum of good users"
                     quorum > 0 -> "Report validated by at least $quorum good users"
                     else -> "Can not ensure the quality of the report. Not enough proofs"
-                }
+                },
+                report.proofs,
+
+                // SIGNATURE NOT USED HERE
+                ""
             )
         }
 
