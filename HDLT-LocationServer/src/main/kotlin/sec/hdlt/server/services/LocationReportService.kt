@@ -51,6 +51,7 @@ class LocationReportService {
                     logger.error("BUSTED - User ${report.id} is not close to user ${proof.prover} on epoch ${report.epoch}")
                     // FIXME: Just ignore??
                     return null
+                    // FIXME: null in coordinates is rightUser???
                 } else {
                     rightUsers++
                 }

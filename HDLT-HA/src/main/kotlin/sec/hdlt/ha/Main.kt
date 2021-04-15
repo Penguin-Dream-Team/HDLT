@@ -131,9 +131,7 @@ suspend fun main(args: Array<String>) {
                     println("Response was not sent by server")
                 }
             } catch (e: StatusException) {
-                // FIXME: Handle
-                e.printStackTrace()
-                println("Couldn't contact server")
+                println("Server error, try again")
                 continue
             }
 
@@ -193,9 +191,7 @@ suspend fun main(args: Array<String>) {
                     println("Response was not sent by server")
                 }
             } catch (e: StatusException) {
-                // FIXME: Handle
-                e.printStackTrace()
-                println("Couldn't contact server")
+                println("Server error, try again")
                 continue
             }
         } else if (option == 3) {

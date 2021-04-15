@@ -6,7 +6,6 @@ import sec.hdlt.server.data.Coordinates
 import sec.hdlt.server.data.Database
 import sec.hdlt.server.data.Proof
 import sec.hdlt.server.verifySignature
-import java.lang.NullPointerException
 import java.security.SignatureException
 
 class RequestValidationService {
@@ -85,14 +84,13 @@ class RequestValidationService {
             return validateSignatureImpl(prover, sig, "${user}${prover}${epoch}", user)
         }
 
-        fun validateRequest(
+        fun getValidProofs(
             user: Int,
             epoch: Int,
             proofs: List<Proof>
-        ): Boolean {
+        ): List<Proof> {
             val provers: MutableSet<Int> = mutableSetOf()
-            proofs.forEach { proof ->
-                // FIXME: Just ignore this signature and move on?
+            return proofs.filter { proof ->
                 if (validateSignature(proof.requester, proof.prover, proof.epoch, proof.signature)) {
                     if (user != proof.requester ||
                         user == proof.prover ||
@@ -100,15 +98,16 @@ class RequestValidationService {
                         provers.contains(proof.prover)
                     ) {
                         println("Invalid proof for user $user sent by user ${proof.prover} on epoch $epoch")
-                        return false
-                    }
+                        false
+                    } else {
+                        provers.add(proof.prover)
 
-                    provers.add(proof.prover)
+                        true
+                    }
                 } else {
-                    return false
+                    false
                 }
-            }
-            return true
+            }.toList()
         }
     }
 }

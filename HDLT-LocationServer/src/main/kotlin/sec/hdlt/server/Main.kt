@@ -89,27 +89,27 @@ class Location(
     override suspend fun locationReport(request: Report.ReportRequest): Report.ReportResponse {
         val report: LocationReport =
             requestToLocationReport(Database.key, request.nonce, request.key, request.ciphertext)
+
         val user = report.id
         val epoch = report.epoch
         val coordinates = report.location
         val sig = report.signature
-        val proofs = report.proofs
+        var proofs = report.proofs
 
-        return if (!RequestValidationService.validateSignature(user, epoch, coordinates, sig) ||
-            !RequestValidationService.validateRequest(user, epoch, proofs) || LocationReportService.hasReport(
-                user,
-                epoch
-            )
-        ) {
-            Report.ReportResponse.newBuilder().apply {
-                ack = false
-            }.build()
-        } else {
-            LocationReportService.storeLocationReport(epoch, user, coordinates, proofs)
-            Report.ReportResponse.newBuilder().apply {
-                ack = true
-            }.build()
+        if (RequestValidationService.validateSignature(user, epoch, coordinates, sig) && !LocationReportService.hasReport(user, epoch)) {
+            proofs = RequestValidationService.getValidProofs(user, epoch, proofs)
+
+            if (proofs.isNotEmpty()) {
+                LocationReportService.storeLocationReport(epoch, user, coordinates, proofs)
+                return Report.ReportResponse.newBuilder().apply {
+                    ack = true
+                }.build()
+            }
         }
+
+        return Report.ReportResponse.newBuilder().apply {
+            ack = false
+        }.build()
     }
 
     override suspend fun userLocationReport(request: Report.UserLocationReportRequest): Report.UserLocationReportResponse {
