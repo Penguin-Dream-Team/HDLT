@@ -8,12 +8,17 @@ import kotlin.random.Random
 class Grid(
     val rows: Int,
     val cols: Int,
+    val f: Int,
+    val fLine: Int,
 ) {
     val cells = mutableMapOf<Int, GridCell>()
 
+    /**
+     * Byzantine users are last F users
+     */
     fun initGrid(userCount: Int) {
         repeat(userCount) { id ->
-            val user = User(id)
+            val user = User(id, byzantine = id >= userCount - f)
             val x = Random.nextInt(cols)
             val y = Random.nextInt(rows)
 
@@ -21,15 +26,15 @@ class Grid(
         }
     }
 
-    fun stepGrid(fLine: Int) {
+    fun stepGrid() {
         cells.forEach { (_, cell) ->
-            val direction = getPossibleDirections(cell, fLine)
+            val direction = getPossibleDirections(cell)
             if (direction.isNotEmpty())
                 cell.move(direction.random())
         }
     }
 
-    private fun getPossibleDirections(cell: GridCell, fLine: Int): List<GridDirection> {
+    private fun getPossibleDirections(cell: GridCell): List<GridDirection> {
         val directions = GridDirection.values().toMutableList()
 
         if (cell.x + 1 == cols) {
@@ -44,14 +49,14 @@ class Grid(
             directions.remove(GridDirection.UP)
         }
 
-        return checkFLineRestrictions(cell, fLine, directions)
+        return checkFLineRestrictions(cell, directions)
     }
 
-    private fun checkFLineRestrictions(currentCell: GridCell, fLine: Int, directions: MutableList<GridDirection>): MutableList<GridDirection> {
+    private fun checkFLineRestrictions(currentCell: GridCell, directions: MutableList<GridDirection>): MutableList<GridDirection> {
         GridDirection.values().forEach { direction ->
             var nearCount = 0
             cells.forEach{ cell ->
-                if (currentCell.isNear(direction, cell.value)) {
+                if (currentCell.user.byzantine && currentCell.isNear(direction, cell.value)) {
                     nearCount++
                 }
             }

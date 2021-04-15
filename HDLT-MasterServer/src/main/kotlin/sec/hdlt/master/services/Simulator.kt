@@ -13,9 +13,9 @@ class Simulator(
     private val userCount: Int,
     private val epochInterval: Double,
     private val f: Int,
-    val fLine: Int,
+    private val fLine: Int,
 ) {
-    val grid: Grid = Grid(rows, cols)
+    val grid: Grid = Grid(rows, cols, f, fLine)
     private val broadcaster: Broadcaster = Broadcaster(userCount)
     private var currentEpoch: Int = 0
 
@@ -38,9 +38,9 @@ class Simulator(
         notifyChannel.offer(Unit)
     }
 
-    fun step(fLine: Int) {
+    fun step() {
         grid.printGrid()
-        grid.stepGrid(fLine)
+        grid.stepGrid()
         onStep()
 
         broadcaster.broadcastEpoch(currentEpoch++, grid)
@@ -54,7 +54,7 @@ class Simulator(
                 while (paused) {
                     notifyChannel.receive()
                 }
-                step(fLine)
+                step()
                 delay((epochInterval * 1000).roundToLong())
             }
         }

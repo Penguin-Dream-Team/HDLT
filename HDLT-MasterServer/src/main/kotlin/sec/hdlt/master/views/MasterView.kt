@@ -52,7 +52,7 @@ class MasterView : View("MasterView") {
                 action {
                     runAsyncWithProgress {
                         isDisable = true
-                        simulatorController.step(simulatorController.simulator!!.fLine)
+                        simulatorController.step()
                         isDisable = false
                     }
                 }
