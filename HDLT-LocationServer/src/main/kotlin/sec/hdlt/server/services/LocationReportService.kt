@@ -53,26 +53,23 @@ class LocationReportService {
         private fun validateLocationReport(report: LocationReport, reports: List<LocationReport>, fLine: Int): LocationResponse? {
             var rightUsers = 0
             report.proofs.forEach { proof ->
-                val prooferCoordinates = getProoferCoordinates(reports, proof.prover)
+                val prooverCoordinates = getProoferCoordinates(reports, proof.prover)
 
-                if (prooferCoordinates != null && !report.location.isNear(prooferCoordinates)) {
+                if (prooverCoordinates != null && !report.location.isNear(prooverCoordinates)) {
                     logger.error("BUSTED - User ${report.id} is not close to user ${proof.prover} on epoch ${report.epoch}")
-                    // FIXME: Just ignore??
-                    return null
-                } else if (prooferCoordinates != null){
+                } else if (prooverCoordinates != null){
                     rightUsers++
                 }
             }
 
-            val quorum = rightUsers - fLine
             return LocationResponse(
                 id = report.id,
                 epoch = report.epoch,
                 coords = report.location,
                 serverInfo = when {
-                    quorum > fLine -> "Report validated by a quorum of good users"
-                    quorum > 0 -> "Report validated by at least $quorum good users"
-                    else -> "Can not ensure the quality of the report. Not enough proofs"
+                    report.proofs.size > fLine -> "Report validated by a quorum of good users"
+                    rightUsers == 0 -> "Can not ensure the quality of the report. Not enough proofs"
+                    else -> "Report validated by at least $rightUsers good users"
                 },
                 report.proofs,
 

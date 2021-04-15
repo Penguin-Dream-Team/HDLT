@@ -117,6 +117,9 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                         Status.INVALID_ARGUMENT.code -> {
                             println("Responder is in different epoch")
                         }
+                        Status.DEADLINE_EXCEEDED.code -> {
+                            println("Responder took too long to answer")
+                        }
                         else -> { println("Unknown error"); e.printStackTrace(); }
                     }
 
