@@ -170,7 +170,7 @@ fun main(args: Array<String>) {
 
                 if (response.nonce.equals("") || response.ciphertext.equals("")) {
                     println("No location found for epoch $epoch")
-                   continue
+                    continue
                 }
 
                 val report: LocationResponse = responseToLocation(secret, response.nonce, response.ciphertext)

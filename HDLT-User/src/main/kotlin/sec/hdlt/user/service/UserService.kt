@@ -26,7 +26,7 @@ class UserService : LocationProofGrpcKt.LocationProofCoroutineImplBase() {
         if (max != null && max + MAX_EPOCH_AHEAD >= request.epoch) {
             var num = 0
             while (Database.epochs.keys.maxOrNull()!! < request.epoch && num < MAX_WAIT) {
-                delay(MAX_GRPC_TIME * 100)
+                delay(WAIT_TIME)
                 num++
             }
 
@@ -35,7 +35,7 @@ class UserService : LocationProofGrpcKt.LocationProofCoroutineImplBase() {
                 return User.LocationProofResponse.getDefaultInstance()
             }
         } else {
-            println("User in epoch way ahead")
+            println("User in epoch way ahead (${request.epoch} vs ${Database.epochs.keys.maxOrNull()})")
             return User.LocationProofResponse.getDefaultInstance()
         }
 
@@ -43,9 +43,9 @@ class UserService : LocationProofGrpcKt.LocationProofCoroutineImplBase() {
 
         // Byzantine Level 4: Redirect request to other user
         if (Database.byzantineLevel >= 4 && Random.nextInt(100) < BYZ_PROB_PASS_REQ) {
-            println("Redirecting request")
-
             val user = info.board.getRandomUser()
+            println("Redirecting request from ${request.id} to ${user.id}")
+
 
             val stub = LocationProofGrpcKt.LocationProofCoroutineStub(
                 ManagedChannelBuilder.forAddress("localhost", user.port).build()
@@ -69,20 +69,20 @@ class UserService : LocationProofGrpcKt.LocationProofCoroutineImplBase() {
             } catch (e: IllegalArgumentException) {
                 println("INVALID BASE64 DETECTED")
                 throw StatusRuntimeException(Status.CANCELLED)
+            } catch (e: NullPointerException) {
+                println("INVALID USER ${request.id} DETECTED")
+                throw StatusRuntimeException(Status.CANCELLED)
             }
 
             // Check if user is near
-            if (!info.position.isNear(info.board.getUserCoords(request.id)) || info.users.contains(request.id)) {
-                throw StatusRuntimeException(Status.FAILED_PRECONDITION)
+            if (!info.position.isNear(info.board.getUserCoords(request.id)) || info.users.contains(request.id) || Database.id == request.id) {
+                return User.LocationProofResponse.getDefaultInstance()
             }
         }
 
-        return if (Database.id == request.id) {
-            User.LocationProofResponse.getDefaultInstance()
-        } else {
-            info.users.add(request.id)
+        info.users.add(request.id)
 
-            User.LocationProofResponse.newBuilder().apply {
+        return User.LocationProofResponse.newBuilder().apply {
                 requesterId = request.id
                 epoch = info.epoch
                 proverId = Database.id
@@ -95,6 +95,5 @@ class UserService : LocationProofGrpcKt.LocationProofCoroutineImplBase() {
                     throw StatusRuntimeException(Status.UNAVAILABLE)
                 }
             }.build()
-        }
     }
 }

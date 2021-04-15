@@ -3,6 +3,7 @@ package sec.hdlt.user.service
 import io.grpc.*
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -38,7 +39,7 @@ class MasterService(private val serverChannel: ManagedChannel, private val mutex
         }
 
         GlobalScope.launch {
-            // FIXME: activate this
+            // FIXME: Activate???
             //delay(Random.nextLong(MIN_TIME_COM, MAX_TIME_COM) * 1000)
 
             communicate(info, serverChannel)
@@ -63,17 +64,20 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
     // Create request once (will be equal for all gRPC calls)
     val request = User.LocationProofRequest.newBuilder().apply {
         id = if (Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
+            println("Tampering with id")
             Random.nextInt(BYZ_MAX_ID_TAMPER)
         } else {
             Database.id
         }
         epoch = if (Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
+            println("Tampering with epoch")
             Random.nextInt(BYZ_MAX_EP_TAMPER)
         } else {
             info.epoch
         }
 
         signature = if (Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
+            println("Tampering with signature")
             Base64.getEncoder().encodeToString(Random.nextBytes(BYZ_BYTES_TAMPER))
         } else {
             try {
@@ -102,45 +106,24 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 try {
                     response = userStub.requestLocationProof(request)
                     userChannel.shutdownNow()
-                } catch (e: StatusRuntimeException) {
-                    when (e.status.code) {
-                        Status.CANCELLED.code -> {
-                            println("Responder detected invalid signature")
-                        }
-                        Status.FAILED_PRECONDITION.code -> {
-                            //println("Responder thinks it is far")
-                        }
-                        Status.UNAUTHENTICATED.code -> {
-                            println("Responder couldn't deliver message")
-                        }
-                        Status.INVALID_ARGUMENT.code -> {
-                            println("Responder is in different epoch")
-                        }
-                        else -> println("Unknown error")
-                    }
-
-                    userChannel.shutdownNow()
-                    return@launch
                 } catch (e: StatusException) {
                     when (e.status.code) {
                         Status.CANCELLED.code -> {
                             println("Responder detected invalid signature")
                         }
-                        Status.FAILED_PRECONDITION.code -> {
-                            //println("Responder thinks it is far")
-                        }
                         Status.UNAUTHENTICATED.code -> {
                             println("Responder couldn't deliver message")
                         }
                         Status.INVALID_ARGUMENT.code -> {
                             println("Responder is in different epoch")
                         }
-                        else -> println("Unknown error")
+                        else -> { println("Unknown error"); e.printStackTrace(); }
                     }
 
                     userChannel.shutdownNow()
                     return@launch
                 } catch (e: Exception) {
+                    println("UNKNOWN EXCEPTION")
                     e.printStackTrace()
                     userChannel.shutdownNow()
                     return@launch
