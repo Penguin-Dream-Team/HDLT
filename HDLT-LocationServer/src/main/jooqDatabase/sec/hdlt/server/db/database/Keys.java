@@ -10,8 +10,12 @@ import org.jooq.UniqueKey;
 import org.jooq.impl.DSL;
 import org.jooq.impl.Internal;
 
+import sec.hdlt.server.db.database.tables.HaNonces;
+import sec.hdlt.server.db.database.tables.Nonces;
 import sec.hdlt.server.db.database.tables.Proofs;
 import sec.hdlt.server.db.database.tables.Reports;
+import sec.hdlt.server.db.database.tables.records.HaNoncesRecord;
+import sec.hdlt.server.db.database.tables.records.NoncesRecord;
 import sec.hdlt.server.db.database.tables.records.ProofsRecord;
 import sec.hdlt.server.db.database.tables.records.ReportsRecord;
 
@@ -27,6 +31,8 @@ public class Keys {
     // UNIQUE and PRIMARY KEY definitions
     // -------------------------------------------------------------------------
 
+    public static final UniqueKey<HaNoncesRecord> PK_HA_NONCES = Internal.createUniqueKey(HaNonces.HA_NONCES, DSL.name("pk_ha_nonces"), new TableField[] { HaNonces.HA_NONCES.NONCE }, true);
+    public static final UniqueKey<NoncesRecord> PK_NONCES = Internal.createUniqueKey(Nonces.NONCES, DSL.name("pk_nonces"), new TableField[] { Nonces.NONCES.USER_ID, Nonces.NONCES.NONCE }, true);
     public static final UniqueKey<ProofsRecord> PK_PROOFS = Internal.createUniqueKey(Proofs.PROOFS, DSL.name("pk_proofs"), new TableField[] { Proofs.PROOFS.ID }, true);
     public static final UniqueKey<ReportsRecord> PK_REPORTS = Internal.createUniqueKey(Reports.REPORTS, DSL.name("pk_reports"), new TableField[] { Reports.REPORTS.ID }, true);
 

@@ -11,6 +11,8 @@ import org.jooq.Catalog;
 import org.jooq.Table;
 import org.jooq.impl.SchemaImpl;
 
+import sec.hdlt.server.db.database.tables.HaNonces;
+import sec.hdlt.server.db.database.tables.Nonces;
 import sec.hdlt.server.db.database.tables.Proofs;
 import sec.hdlt.server.db.database.tables.Reports;
 import sec.hdlt.server.db.database.tables.SqliteSequence;
@@ -28,6 +30,16 @@ public class DefaultSchema extends SchemaImpl {
      * The reference instance of <code>DEFAULT_SCHEMA</code>
      */
     public static final DefaultSchema DEFAULT_SCHEMA = new DefaultSchema();
+
+    /**
+     * The table <code>ha_nonces</code>.
+     */
+    public final HaNonces HA_NONCES = HaNonces.HA_NONCES;
+
+    /**
+     * The table <code>nonces</code>.
+     */
+    public final Nonces NONCES = Nonces.NONCES;
 
     /**
      * The table <code>proofs</code>.
@@ -60,6 +72,8 @@ public class DefaultSchema extends SchemaImpl {
     @Override
     public final List<Table<?>> getTables() {
         return Arrays.<Table<?>>asList(
+            HaNonces.HA_NONCES,
+            Nonces.NONCES,
             Proofs.PROOFS,
             Reports.REPORTS,
             SqliteSequence.SQLITE_SEQUENCE);

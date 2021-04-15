@@ -7,8 +7,11 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.jooq.SQLDialect
+import org.jooq.exception.DataAccessException
 import org.jooq.impl.DefaultConfiguration
 import sec.hdlt.protos.server.*
+import sec.hdlt.server.dao.AbstractDAO
+import sec.hdlt.server.dao.NonceDAO
 import sec.hdlt.server.dao.ReportDAO
 import sec.hdlt.server.data.*
 import sec.hdlt.server.services.LocationReportService
@@ -31,14 +34,14 @@ const val KEYSTORE_PASS = "KeyStoreServer"
 var F = 0
 var FLINE = 0
 
-fun initDatabaseDaos(): ReportDAO {
+fun initDatabaseDaos(): Map<String, AbstractDAO> {
     val dbConfig = DefaultConfiguration()
         .set(SQLDialect.SQLITE)
         .set(HikariDataSource(HikariConfig().apply {
             jdbcUrl = "jdbc:sqlite:src/main/resources/db/database.sqlite"
             maximumPoolSize = 15
         }))
-    return ReportDAO(dbConfig)
+    return mapOf("report" to ReportDAO(dbConfig), "userNonces" to NonceDAO(dbConfig))
 }
 
 fun main() {
@@ -46,7 +49,9 @@ fun main() {
     val keyStore = KeyStore.getInstance("jks")
     val keystoreFile: InputStream = object {}.javaClass.getResourceAsStream(KEYSTORE_FILE)!!
 
-    val reportDao = initDatabaseDaos()
+    val daos = initDatabaseDaos()
+    val reportDao = daos["report"] as ReportDAO
+    val nonceDao = daos["userNonces"] as NonceDAO
 
     try {
         keyStore.load(keystoreFile, KEYSTORE_PASS.toCharArray())
@@ -60,12 +65,12 @@ fun main() {
 
     val serverKey: PrivateKey = keyStore.getKey(KEY_SERVER_ALIAS, KEY_SERVER_PASS.toCharArray()) as PrivateKey
 
-    Database(keyStore, serverKey, reportDao)
+    Database(keyStore, serverKey, reportDao, nonceDao)
 
     val server = ServerBuilder.forPort(7777).apply {
-        addService(Location(ConcurrentHashMap.newKeySet()))
+        addService(Location())
         addService(Setup())
-        addService(HA(ConcurrentHashMap.newKeySet()))
+        addService(HA())
     }.build()
 
     server.start()
@@ -83,9 +88,7 @@ class Setup : SetupGrpcKt.SetupCoroutineImplBase() {
     }
 }
 
-class Location(
-    private val usedNonces: MutableSet<ByteArray>
-) : LocationGrpcKt.LocationCoroutineImplBase() {
+class Location : LocationGrpcKt.LocationCoroutineImplBase() {
     override suspend fun locationReport(request: Report.ReportRequest): Report.ReportResponse {
         val report: LocationReport =
             requestToLocationReport(Database.key, request.nonce, request.key, request.ciphertext)
@@ -96,7 +99,13 @@ class Location(
         val sig = report.signature
         var proofs = report.proofs
 
-        if (RequestValidationService.validateSignature(user, epoch, coordinates, sig) && !LocationReportService.hasReport(user, epoch)) {
+        if (RequestValidationService.validateSignature(
+                user,
+                epoch,
+                coordinates,
+                sig
+            ) && !LocationReportService.hasReport(user, epoch)
+        ) {
             proofs = RequestValidationService.getValidProofs(user, epoch, proofs)
 
             if (proofs.isNotEmpty()) {
@@ -120,12 +129,16 @@ class Location(
         val sig = locationRequest.signature
 
         val decipheredNonce = Base64.getDecoder().decode(request.nonce)
+        val validNonce = try {
+            Database.nonceDAO.storeUserNonce(decipheredNonce, user)
+        } catch (e: DataAccessException) {
+            false
+        }
 
-        if (usedNonces.contains(decipheredNonce) || !RequestValidationService.validateSignature(user, epoch, sig)) {
+        if (!validNonce || !RequestValidationService.validateSignature(user, epoch, sig)) {
             return Report.UserLocationReportResponse.getDefaultInstance()
         }
 
-        usedNonces.add(decipheredNonce)
         val locationReport = LocationReportService.getLocationReport(user, epoch, F)
         return if (locationReport != null) {
             locationReport.signature = sign(
@@ -149,7 +162,7 @@ class Location(
     }
 }
 
-class HA(val usedNonces: MutableSet<ByteArray>) : HAGrpcKt.HACoroutineImplBase() {
+class HA : HAGrpcKt.HACoroutineImplBase() {
     override suspend fun userLocationReport(request: Report.UserLocationReportRequest): Report.UserLocationReportResponse {
         val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
         val locationRequest: LocationRequest = requestToLocationRequest(symKey, request.nonce, request.ciphertext)
@@ -159,11 +172,16 @@ class HA(val usedNonces: MutableSet<ByteArray>) : HAGrpcKt.HACoroutineImplBase()
 
         val decipheredNonce = Base64.getDecoder().decode(request.nonce)
 
-        if (usedNonces.contains(decipheredNonce) || !RequestValidationService.validateHASignature(user, epoch, sig)) {
+        val validNonce = try {
+            Database.nonceDAO.storeHANonce(decipheredNonce)
+        } catch (e: DataAccessException) {
+            false
+        }
+
+        if (!validNonce || !RequestValidationService.validateSignature(user, epoch, sig)) {
             return Report.UserLocationReportResponse.getDefaultInstance()
         }
 
-        usedNonces.add(decipheredNonce)
         val locationReport = LocationReportService.getLocationReport(user, epoch, FLINE)
         return if (locationReport != null) {
             locationReport.signature = sign(
@@ -194,12 +212,13 @@ class HA(val usedNonces: MutableSet<ByteArray>) : HAGrpcKt.HACoroutineImplBase()
         val signature = usersRequest.signature
 
         val decipheredNonce = Base64.getDecoder().decode(request.nonce)
-        if (usedNonces.contains(decipheredNonce) || !RequestValidationService.validateHASignature(
-                epoch,
-                coordinates,
-                signature
-            )
-        ) {
+        val validNonce = try {
+            Database.nonceDAO.storeHANonce(decipheredNonce)
+        } catch (e: DataAccessException) {
+            false
+        }
+
+        if (!validNonce || !RequestValidationService.validateHASignature(epoch, coordinates, signature)) {
             return Report.UsersAtCoordinatesResponse.getDefaultInstance()
         }
 

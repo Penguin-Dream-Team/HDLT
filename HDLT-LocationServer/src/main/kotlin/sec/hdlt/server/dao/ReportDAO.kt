@@ -15,7 +15,7 @@ import sec.hdlt.server.exceptions.UserReportNotFoundException
 
 class ReportDAO(
     conf: Configuration
-) {
+) : AbstractDAO() {
     private val dslContext = DSL.using(conf)
 
     fun epochHasReports(epoch: Int, create: DSLContext = dslContext): Boolean {
@@ -167,17 +167,3 @@ class ReportDAO(
 
 }
 
-private fun <R : Record> InsertSetMoreStep<R>.set(column: TableField<R, UInteger>, value: Int): InsertSetMoreStep<R> {
-    return set(column, UInteger.valueOf(value))
-}
-
-private fun <R : Record> InsertSetStep<R>.set(column: TableField<R, UInteger>, value: Int): InsertSetMoreStep<R> {
-    return set(column, UInteger.valueOf(value))
-}
-
-/**
- * Helper extension to avoid repetition
- */
-private fun <R : Record> TableField<R, UInteger>.eq(other: Int): Condition {
-    return eq(UInteger.valueOf(other))
-}

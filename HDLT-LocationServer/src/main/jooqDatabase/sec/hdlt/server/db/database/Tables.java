@@ -4,6 +4,8 @@
 package sec.hdlt.server.db.database;
 
 
+import sec.hdlt.server.db.database.tables.HaNonces;
+import sec.hdlt.server.db.database.tables.Nonces;
 import sec.hdlt.server.db.database.tables.Proofs;
 import sec.hdlt.server.db.database.tables.Reports;
 import sec.hdlt.server.db.database.tables.SqliteSequence;
@@ -14,6 +16,16 @@ import sec.hdlt.server.db.database.tables.SqliteSequence;
  */
 @SuppressWarnings({ "all", "unchecked", "rawtypes" })
 public class Tables {
+
+    /**
+     * The table <code>ha_nonces</code>.
+     */
+    public static final HaNonces HA_NONCES = HaNonces.HA_NONCES;
+
+    /**
+     * The table <code>nonces</code>.
+     */
+    public static final Nonces NONCES = Nonces.NONCES;
 
     /**
      * The table <code>proofs</code>.
