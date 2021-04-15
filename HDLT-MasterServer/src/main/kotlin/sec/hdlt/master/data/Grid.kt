@@ -21,14 +21,15 @@ class Grid(
         }
     }
 
-    fun stepGrid() {
+    fun stepGrid(fLine: Int) {
         cells.forEach { (_, cell) ->
-            val direction = getPossibleDirections(cell).random()
-            cell.move(direction)
+            val direction = getPossibleDirections(cell, fLine)
+            if (direction.isNotEmpty())
+                cell.move(direction.random())
         }
     }
 
-    private fun getPossibleDirections(cell: GridCell): List<GridDirection> {
+    private fun getPossibleDirections(cell: GridCell, fLine: Int): List<GridDirection> {
         val directions = GridDirection.values().toMutableList()
 
         if (cell.x + 1 == cols) {
@@ -43,6 +44,21 @@ class Grid(
             directions.remove(GridDirection.UP)
         }
 
+        return checkFLineRestrictions(cell, fLine, directions)
+    }
+
+    private fun checkFLineRestrictions(currentCell: GridCell, fLine: Int, directions: MutableList<GridDirection>): MutableList<GridDirection> {
+        GridDirection.values().forEach { direction ->
+            var nearCount = 0
+            cells.forEach{ cell ->
+                if (currentCell.isNear(direction, cell.value)) {
+                    nearCount++
+                }
+            }
+            if (nearCount > fLine) {
+                directions.remove(direction)
+            }
+        }
         return directions
     }
 

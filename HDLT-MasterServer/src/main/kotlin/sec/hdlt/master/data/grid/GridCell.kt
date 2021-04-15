@@ -15,5 +15,14 @@ data class GridCell(
             GridDirection.DOWN -> y++
         }
     }
+
+    fun isNear(direction: GridDirection, other: GridCell): Boolean {
+        return when (direction) {
+            GridDirection.LEFT -> kotlin.math.abs(x-1 - other.x) <= 1 && kotlin.math.abs(y - other.y) <= 1
+            GridDirection.RIGHT -> kotlin.math.abs(x+1 - other.x) <= 1 && kotlin.math.abs(y - other.y) <= 1
+            GridDirection.UP -> kotlin.math.abs(x - other.x) <= 1 && kotlin.math.abs(y-1 - other.y) <= 1
+            GridDirection.DOWN -> kotlin.math.abs(x - other.x) <= 1 && kotlin.math.abs(y+1 - other.y) <= 1
+        }
+    }
 }
 

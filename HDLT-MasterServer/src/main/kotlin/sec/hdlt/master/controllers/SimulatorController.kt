@@ -37,8 +37,8 @@ class SimulatorController : Controller() {
         started = true
     }
 
-    fun step() {
-        simulator?.step()
+    fun step(fLine: Int) {
+        simulator?.step(fLine)
     }
 
     fun pause() {
