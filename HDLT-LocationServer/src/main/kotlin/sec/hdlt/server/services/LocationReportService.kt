@@ -2,7 +2,10 @@ package sec.hdlt.server.services
 
 import org.slf4j.LoggerFactory
 import sec.hdlt.server.data.*
+import sec.hdlt.server.exceptions.DuplicateReportException
 import sec.hdlt.server.exceptions.HDLTException
+import sec.hdlt.server.exceptions.ReportCreationException
+import javax.xml.crypto.Data
 
 class LocationReportService {
     companion object {
@@ -13,11 +16,16 @@ class LocationReportService {
             user: Int,
             coordinates: Coordinates,
             proofs: List<Proof>
-        ) {
-            try {
+        ) : Boolean {
+            return try {
+                if (Database.reportDAO.hasUserReport(user, epoch)) {
+                    throw DuplicateReportException(user, epoch)
+                }
                 Database.reportDAO.saveUserReport(epoch, user, coordinates, proofs)
+                true
             } catch (ex: HDLTException) {
                 logger.error(ex.message)
+                false
             }
         }
 

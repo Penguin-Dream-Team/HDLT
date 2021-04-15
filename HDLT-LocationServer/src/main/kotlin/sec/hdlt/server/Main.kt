@@ -100,9 +100,9 @@ class Location(
             proofs = RequestValidationService.getValidProofs(user, epoch, proofs)
 
             if (proofs.isNotEmpty()) {
-                LocationReportService.storeLocationReport(epoch, user, coordinates, proofs)
+                val ack = LocationReportService.storeLocationReport(epoch, user, coordinates, proofs)
                 return Report.ReportResponse.newBuilder().apply {
-                    ack = true
+                    this.ack = ack
                 }.build()
             }
         }
