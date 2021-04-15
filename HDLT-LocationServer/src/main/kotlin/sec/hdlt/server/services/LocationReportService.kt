@@ -34,6 +34,10 @@ class LocationReportService {
             }
         }
 
+        fun hasReport(userId: Int, epoch: Int): Boolean {
+            return Database.reportDAO.hasUserReport(userId, epoch)
+        }
+
         fun getUsersAtLocation(epoch: Int, coords: Coordinates): List<Int> {
             return Database.reportDAO.getUsersAtLocation(epoch, coords)
         }

@@ -96,7 +96,7 @@ class Location(
         val proofs = report.proofs
 
         return if (!RequestValidationService.validateSignature(user, epoch, coordinates, sig) ||
-            !RequestValidationService.validateRequest(user, epoch, proofs)
+            !RequestValidationService.validateRequest(user, epoch, proofs) || LocationReportService.hasReport(user, epoch)
         ) {
             Report.ReportResponse.newBuilder().apply {
                 ack = false

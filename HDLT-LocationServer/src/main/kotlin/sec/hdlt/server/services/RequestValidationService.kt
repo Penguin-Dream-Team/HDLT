@@ -6,6 +6,7 @@ import sec.hdlt.server.data.Coordinates
 import sec.hdlt.server.data.Database
 import sec.hdlt.server.data.Proof
 import sec.hdlt.server.verifySignature
+import java.lang.NullPointerException
 import java.security.SignatureException
 
 class RequestValidationService {
@@ -19,6 +20,9 @@ class RequestValidationService {
 
             } catch (e: IllegalArgumentException) {
                 println("Invalid base64 detected for user $requester")
+                false
+            } catch (e: NullPointerException) {
+                println("Invalid user with id $user")
                 false
             }
         }
