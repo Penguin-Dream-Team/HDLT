@@ -16,6 +16,7 @@ import sec.hdlt.server.dao.ReportDAO
 import sec.hdlt.server.data.*
 import sec.hdlt.server.services.LocationReportService
 import sec.hdlt.server.services.RequestValidationService
+import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.security.KeyStore
@@ -23,6 +24,7 @@ import java.security.PrivateKey
 import java.security.cert.CertificateException
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
+import java.util.logging.Logger
 import javax.crypto.SecretKey
 
 const val KEY_USER_PREFIX = "cert_hdlt_user_"
@@ -33,6 +35,7 @@ const val KEYSTORE_FILE = "/server.jks"
 const val KEYSTORE_PASS = "KeyStoreServer"
 var F = 0
 var FLINE = 0
+val logger = Logger.getLogger("LocationServer")
 
 fun initDatabaseDaos(): Map<String, AbstractDAO> {
     val dbConfig = DefaultConfiguration()
@@ -48,6 +51,7 @@ fun main() {
     // Load the keystore
     val keyStore = KeyStore.getInstance("jks")
     val keystoreFile: InputStream = object {}.javaClass.getResourceAsStream(KEYSTORE_FILE)!!
+    loadServerSettings()
 
     val daos = initDatabaseDaos()
     val reportDao = daos["report"] as ReportDAO
@@ -77,10 +81,28 @@ fun main() {
     server.awaitTermination()
 }
 
+fun loadServerSettings() {
+    try {
+        val file = File("server.settings")
+        val line = file.readLines().first()
+        val split = line.split(" ")
+        F = split[0].toInt()
+        FLINE = split[1].toInt()
+    } catch (e: Exception) {
+        logger.severe("Couldn't load server settings to file")
+    }
+}
+
 class Setup : SetupGrpcKt.SetupCoroutineImplBase() {
     override suspend fun broadcastValues(request: Server.BroadcastValuesRequest): Server.BroadcastValuesResponse {
         F = request.f
         FLINE = request.fLine
+        try {
+            val file = File("server.settings")
+            file.writeText("$F $FLINE")
+        } catch (e: Exception) {
+            logger.severe("Couldn't save server settings to file")
+        }
 
         return Server.BroadcastValuesResponse.newBuilder().apply {
             ok = true
