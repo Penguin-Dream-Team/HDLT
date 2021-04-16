@@ -1,5 +1,12 @@
 # Highly Dependable Location Tracker - Stage 1
 
+## Environment & Technologies
+
+The project was developed in [Kotlin](https://kotlinlang.org) and uses [Gradle](https://gradle.com) as a build tool to
+facilitate development as well as testing. We recommend opening the entire project in [IntelliJ](https://www.jetbrains.com/idea/) as it comes with gradle
+and kotlin installed. It is a lot easier to work within this IDE. It integrates fairly well with both of these
+technologies.
+
 ## Modules Structure
 
 The project is divided in 5 different modules:
@@ -46,6 +53,7 @@ The port of the server is hardcoded as `7777` for now. Byzantine level defines i
 byzantine or not (-1 for always correct, 6 for hardest level).
 
 Byzantine levels:
+
 0. Forge reports with _self-signed_ proofs
 1. Skip epoch communication
 2. Tamper some fields in requests
@@ -55,8 +63,8 @@ Byzantine levels:
 
 _**NOTE:** -1 for no byzantine_
 
-_**NOTE:** The users' ports start at 8100, and the id is used to get a unique port per user: 8100+id. This is why the id needs to
-be incremental and start at 0_
+_**NOTE:** The users' ports start at 8100, and the id is used to get a unique port per user: 8100+id. This is why the id
+needs to be incremental and start at 0_
 
 The master will define the byzantine users as the last f users. This means that if you wish to have byzantine users,
 make sure their id starts from userCount - f.
