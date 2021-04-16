@@ -50,7 +50,7 @@ gradlew HDLT-User:run --args="<id> <serverAddress> <port> <byzantineLevel>"
 
 The id should be incremental for each user and should start at 0. The serverAddress should be `localhost` in most cases.
 The port of the server is hardcoded as `7777` for now. Byzantine level defines if the user will be attempting to be
-byzantine or not (-1 for always correct, 6 for hardest level).
+byzantine or not (-1 for always correct, 5 for hardest level).
 
 Byzantine levels:
 
@@ -81,7 +81,9 @@ If you wish to create new certificates, you can use the `generate` script with t
 gradlew HDLT-HA:run < generate
 ```
 
-If you want to change the values, you can run the command without the script.
+If you want to change the values, you can run the command without the script, but change the values also in the respective
+`Main.kt` of the module, and replace the generated keystores in the respective folders (`src/main/resources` of the module).
+Default values are simple just for simple debug, but passwords can be strengthened very easily.
 
 ## Full example
 
@@ -111,8 +113,8 @@ initialize. Each user will have its own terminal, and the series of commands wil
 ```bash
 gradlew HDLT-User:run --args="0 localhost 7777 -1"
 gradlew HDLT-User:run --args="1 localhost 7777 -1"
-gradlew HDLT-User:run --args="2 localhost 7777 1"
-gradlew HDLT-User:run --args="3 localhost 7777 2"
+gradlew HDLT-User:run --args="2 localhost 7777 3"
+gradlew HDLT-User:run --args="3 localhost 7777 5"
 ```
 
 This means user 2 and 3 will be byzantine and can have incorrect behaviour.
@@ -129,8 +131,9 @@ One can do this by just typing the desired epoch in the user prompt. If the user
 fetch the reports of another user by specifying the other user's id after the epoch.
 
 ```bash
-// Normal execution - User 0 request report for epoch 5
+// Assuming these commands run on User 0
+// Normal execution - User 0 requests own report for epoch 5
 5
-// Byzantine execution - User 3 request report for epoch 5 for user 0
-5 0
+// Byzantine execution - User 0 requests report of user 3 for epoch 5 for user
+5 3
 ```
