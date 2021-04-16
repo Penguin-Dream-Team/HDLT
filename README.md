@@ -43,9 +43,19 @@ gradlew HDLT-User:run --args="<id> <serverAddress> <port> <byzantineLevel>"
 
 The id should be incremental for each user and should start at 0. The serverAddress should be `localhost` in most cases.
 The port of the server is hardcoded as `7777` for now. Byzantine level defines if the user will be attempting to be
-byzantine or not (-1 for always correct).
+byzantine or not (-1 for always correct, 6 for hardest level).
 
-_The users' ports start at 8100, and the id is used to get a unique port per user: 8100+id. This is why the id needs to
+Byzantine levels:
+0. Forge reports with _self-signed_ proofs
+1. Skip epoch communication
+2. Tamper some fields in requests
+3. Reject another user's requests
+4. Redirect requests to other users
+5. No information verification
+
+_**NOTE:** -1 for no byzantine_
+
+_**NOTE:** The users' ports start at 8100, and the id is used to get a unique port per user: 8100+id. This is why the id needs to
 be incremental and start at 0_
 
 The master will define the byzantine users as the last f users. This means that if you wish to have byzantine users,
@@ -116,14 +126,3 @@ fetch the reports of another user by specifying the other user's id after the ep
 // Byzantine execution - User 3 request report for epoch 5 for user 0
 5 0
 ```
-
-
-
-
-
-
-
-
-
-
-
