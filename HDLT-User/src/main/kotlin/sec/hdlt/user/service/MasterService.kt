@@ -3,7 +3,6 @@ package sec.hdlt.user.service
 import io.grpc.*
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -120,7 +119,8 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                         Status.DEADLINE_EXCEEDED.code -> {
                             println("Responder took too long to answer")
                         }
-                        else -> { println("Unknown error"); }
+                        else -> {
+                            println("Unknown error"); }
                     }
 
                     userChannel.shutdownNow()
@@ -154,7 +154,12 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
 
                     // Check signature
                     try {
-                        if (!verifySignature(Database.keyStore.getCertificate(KEY_ALIAS_PREFIX + user.id), "${Database.id}${user.id}${info.epoch}", response.signature)) {
+                        if (!verifySignature(
+                                Database.keyStore.getCertificate(KEY_ALIAS_PREFIX + user.id),
+                                "${Database.id}${user.id}${info.epoch}",
+                                response.signature
+                            )
+                        ) {
                             println("Invalid signature detected")
                             userChannel.shutdownNow()
                             return@launch
@@ -313,10 +318,14 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
     // Send request to server
     val serverStub = LocationGrpcKt.LocationCoroutineStub(serverChannel)
 
-    if (serverStub.locationReport(serverRequest).ack) {
-        println("Request was OK")
-    } else {
-        println("BUSTED BY THE SERVER")
+    try {
+        if (serverStub.locationReport(serverRequest).ack) {
+            println("Request was OK")
+        } else {
+            println("BUSTED BY THE SERVER")
+        }
+    } catch (e: StatusException) {
+        println("Server error when submitting report")
     }
 
     // Byzantine Level 0: Create non-existent request
@@ -365,17 +374,21 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
             )
         )
 
-        if (serverStub.locationReport(Report.ReportRequest.newBuilder().apply {
-                val secret = generateKey()
-                val messageNonce = generateNonce()
-                val serverCert = Database.serverCert
-                key = asymmetricCipher(serverCert.publicKey, Base64.getEncoder().encodeToString(secret.encoded))
-                nonce = Base64.getEncoder().encodeToString(messageNonce)
-                ciphertext = symmetricCipher(secret, Json.encodeToString(forgedReport), messageNonce)
-            }.build()).ack) {
-            println("Request was OK :O")
-        } else {
-            println("Dumb user busted")
+        try {
+            if (serverStub.locationReport(Report.ReportRequest.newBuilder().apply {
+                    val secret = generateKey()
+                    val messageNonce = generateNonce()
+                    val serverCert = Database.serverCert
+                    key = asymmetricCipher(serverCert.publicKey, Base64.getEncoder().encodeToString(secret.encoded))
+                    nonce = Base64.getEncoder().encodeToString(messageNonce)
+                    ciphertext = symmetricCipher(secret, Json.encodeToString(forgedReport), messageNonce)
+                }.build()).ack) {
+                println("Request was OK :O")
+            } else {
+                println("Dumb user busted")
+            }
+        } catch (e: StatusException) {
+            println("Server error on request forging")
         }
     }
 }

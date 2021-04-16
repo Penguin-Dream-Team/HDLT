@@ -2,6 +2,7 @@ package sec.hdlt.user
 
 import io.grpc.ManagedChannelBuilder
 import io.grpc.ServerBuilder
+import io.grpc.StatusException
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
@@ -183,6 +184,9 @@ fun main(args: Array<String>) {
 
             } catch (e: SignatureException) {
                 println("Could not sign message")
+                continue
+            } catch (e: StatusException) {
+                println("Error connecting to server")
                 continue
             }
         }
