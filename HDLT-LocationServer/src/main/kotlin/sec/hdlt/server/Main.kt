@@ -178,7 +178,7 @@ class HA : HAGrpcKt.HACoroutineImplBase() {
             false
         }
 
-        if (!validNonce || !RequestValidationService.validateSignature(user, epoch, sig)) {
+        if (!validNonce || !RequestValidationService.validateHASignature(user, epoch, sig)) {
             return Report.UserLocationReportResponse.getDefaultInstance()
         }
 

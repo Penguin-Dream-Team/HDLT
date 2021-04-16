@@ -39,7 +39,7 @@ class MasterService(private val serverChannel: ManagedChannel, private val mutex
         }
 
         GlobalScope.launch {
-            // FIXME: Activate???
+            // Do not activate until second delivery
             //delay(Random.nextLong(MIN_TIME_COM, MAX_TIME_COM) * 1000)
 
             communicate(info, serverChannel)
@@ -120,14 +120,13 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                         Status.DEADLINE_EXCEEDED.code -> {
                             println("Responder took too long to answer")
                         }
-                        else -> { println("Unknown error"); e.printStackTrace(); }
+                        else -> { println("Unknown error"); }
                     }
 
                     userChannel.shutdownNow()
                     return@launch
                 } catch (e: Exception) {
                     println("UNKNOWN EXCEPTION")
-                    e.printStackTrace()
                     userChannel.shutdownNow()
                     return@launch
                 }

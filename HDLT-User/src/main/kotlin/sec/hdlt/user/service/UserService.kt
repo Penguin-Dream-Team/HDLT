@@ -129,7 +129,6 @@ class UserService : LocationProofGrpcKt.LocationProofCoroutineImplBase() {
                 println("CANCELLED BY CLIENT")
             } else {
                 println("UNKNOWN ERROR")
-                e.printStackTrace()
             }
             return User.LocationProofResponse.getDefaultInstance()
         }
