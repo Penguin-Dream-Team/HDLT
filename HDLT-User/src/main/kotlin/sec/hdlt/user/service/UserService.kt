@@ -11,7 +11,6 @@ import sec.hdlt.user.*
 import sec.hdlt.user.domain.Database
 import sec.hdlt.user.domain.EpochInfo
 import java.security.SignatureException
-import kotlin.random.Random
 
 const val WAIT_TIME: Long = MAX_GRPC_TIME * 100
 const val MAX_WAIT: Long = MAX_GRPC_TIME * 1000 / WAIT_TIME
@@ -25,7 +24,7 @@ class UserService : LocationProofGrpcKt.LocationProofCoroutineImplBase() {
             }
 
             // Byzantine Level 3: Ignore location request
-            if (Database.byzantineLevel >= 3 && Random.nextInt(100) < BYZ_PROB_REJ_REQ) {
+            if (Database.byzantineLevel >= 3 && Database.random.nextInt(100) < BYZ_PROB_REJ_REQ) {
                 println("Rejecting user location")
                 return User.LocationProofResponse.getDefaultInstance()
             }
@@ -55,7 +54,7 @@ class UserService : LocationProofGrpcKt.LocationProofCoroutineImplBase() {
             }
 
             // Byzantine Level 4: Redirect request to other user
-            if (Database.byzantineLevel >= 4 && Random.nextInt(100) < BYZ_PROB_PASS_REQ) {
+            if (Database.byzantineLevel >= 4 && Database.random.nextInt(100) < BYZ_PROB_PASS_REQ) {
                 val user = info.board.getRandomUser()
                 println("Redirecting request from ${request.id} to ${user.id}")
 
@@ -76,7 +75,7 @@ class UserService : LocationProofGrpcKt.LocationProofCoroutineImplBase() {
             }
 
             // Byzantine Level 5: No verification of data
-            if (Database.byzantineLevel >= 5 && Random.nextInt(100) < BYZ_PROB_NO_VER) {
+            if (Database.byzantineLevel >= 5 && Database.random.nextInt(100) < BYZ_PROB_NO_VER) {
                 // Skip verification
             } else {
                 try {

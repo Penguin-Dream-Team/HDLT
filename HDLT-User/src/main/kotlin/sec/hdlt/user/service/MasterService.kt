@@ -46,7 +46,7 @@ class MasterService : HDLTMasterGrpcKt.HDLTMasterCoroutineImplBase() {
 
         GlobalScope.launch {
             // Do not activate until second delivery
-            //delay(Random.nextLong(MIN_TIME_COM, MAX_TIME_COM) * 1000)
+            //delay(Database.random.nextLong(MIN_TIME_COM, MAX_TIME_COM) * 1000)
 
             communicate(info)
         }
@@ -60,7 +60,7 @@ class MasterService : HDLTMasterGrpcKt.HDLTMasterCoroutineImplBase() {
 
 suspend fun communicate(info: EpochInfo) {
     // Byzantine Level 1: Skip communication
-    if (Database.byzantineLevel >= 1 && Random.nextInt(100) < BYZ_PROB_NOT_SEND) {
+    if (Database.byzantineLevel >= 1 && Database.random.nextInt(100) < BYZ_PROB_NOT_SEND) {
         return
     }
 
@@ -69,22 +69,22 @@ suspend fun communicate(info: EpochInfo) {
     // Byzantine Level 2: Tamper with fields
     // Create request once (will be equal for all gRPC calls)
     val request = User.LocationProofRequest.newBuilder().apply {
-        id = if (Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
+        id = if (Database.byzantineLevel >= 2 && Database.random.nextInt(100) < BYZ_PROB_TAMPER) {
             println("[EPOCH ${info.epoch}] Tampering with id")
-            Random.nextInt(BYZ_MAX_ID_TAMPER)
+            Database.random.nextInt(BYZ_MAX_ID_TAMPER)
         } else {
             Database.id
         }
-        epoch = if (Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
+        epoch = if (Database.byzantineLevel >= 2 && Database.random.nextInt(100) < BYZ_PROB_TAMPER) {
             println("[EPOCH ${info.epoch}] Tampering with epoch")
-            Random.nextInt(BYZ_MAX_EP_TAMPER)
+            Database.random.nextInt(BYZ_MAX_EP_TAMPER)
         } else {
             info.epoch
         }
 
-        signature = if (Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
+        signature = if (Database.byzantineLevel >= 2 && Database.random.nextInt(100) < BYZ_PROB_TAMPER) {
             println("[EPOCH ${info.epoch}] Tampering with signature")
-            Base64.getEncoder().encodeToString(Random.nextBytes(BYZ_BYTES_TAMPER))
+            Base64.getEncoder().encodeToString(Database.random.nextBytes(BYZ_BYTES_TAMPER))
         } else {
             try {
                 sign(Database.key, "${Database.id}${info.epoch}")
@@ -134,12 +134,13 @@ suspend fun communicate(info: EpochInfo) {
                     return@launch
                 } catch (e: Exception) {
                     println("[EPOCH ${info.epoch} PROVER ${user.id}] UNKNOWN EXCEPTION")
+                    e.printStackTrace()
                     userChannel.shutdownNow()
                     return@launch
                 }
 
                 // Byzantine Level 5: No verification of data
-                if (Database.byzantineLevel >= 5 && Random.nextInt(100) < BYZ_PROB_NO_VER) {
+                if (Database.byzantineLevel >= 5 && Database.random.nextInt(100) < BYZ_PROB_NO_VER) {
                     // Skip verifications
                 } else {
                     // Check response
@@ -199,23 +200,23 @@ suspend fun communicate(info: EpochInfo) {
     }
 
     // Byzantine Level 2: Tamper with fields
-    val report: ReportInfo = if (Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
+    val report: ReportInfo = if (Database.byzantineLevel >= 2 && Database.random.nextInt(100) < BYZ_PROB_TAMPER) {
         println("[EPOCH ${info.epoch}] Tampering with request to server fields")
         var tampered = BYZ_MAX_TIMES_TAMPER
 
         ReportInfo(
             // Id
-            if (tampered > 0 && Random.nextBoolean()) {
+            if (tampered > 0 && Database.random.nextBoolean()) {
                 tampered--
-                Random.nextInt(BYZ_MAX_ID_TAMPER)
+                Database.random.nextInt(BYZ_MAX_ID_TAMPER)
             } else {
                 Database.id
             },
 
             // Epoch
-            if (tampered > 0 && Random.nextBoolean()) {
+            if (tampered > 0 && Database.random.nextBoolean()) {
                 tampered--
-                Random.nextInt(BYZ_MAX_EP_TAMPER)
+                Database.random.nextInt(BYZ_MAX_EP_TAMPER)
             } else {
                 info.epoch
             },
@@ -223,26 +224,26 @@ suspend fun communicate(info: EpochInfo) {
             // Location
             Coordinates(
                 // X coord
-                if (tampered > 0 && Random.nextBoolean()) {
+                if (tampered > 0 && Database.random.nextBoolean()) {
                     tampered--
-                    Random.nextInt(BYZ_MAX_COORDS_TAMPER)
+                    Database.random.nextInt(BYZ_MAX_COORDS_TAMPER)
                 } else {
                     info.position.x
                 },
 
                 // Y coord
-                if (tampered > 0 && Random.nextBoolean()) {
-                    Random.nextInt(BYZ_MAX_COORDS_TAMPER)
+                if (tampered > 0 && Database.random.nextBoolean()) {
+                    Database.random.nextInt(BYZ_MAX_COORDS_TAMPER)
                 } else {
                     info.position.y
                 }
             ),
 
             // Signature
-            if (tampered > 0 && Random.nextBoolean()) {
+            if (tampered > 0 && Database.random.nextBoolean()) {
                 tampered--
                 Base64.getEncoder().encodeToString(
-                    Random.nextBytes(
+                    Database.random.nextBytes(
                         BYZ_BYTES_TAMPER
                     )
                 )
@@ -259,31 +260,31 @@ suspend fun communicate(info: EpochInfo) {
             proofs.stream().map {
                 Proof(
                     // Requester Id
-                    if (tampered > 0 && Random.nextBoolean()) {
+                    if (tampered > 0 && Database.random.nextBoolean()) {
                         tampered--
-                        Random.nextInt(BYZ_MAX_ID_TAMPER)
+                        Database.random.nextInt(BYZ_MAX_ID_TAMPER)
                     } else {
                         it.requester
                     },
 
                     // Prover Id
-                    if (tampered > 0 && Random.nextBoolean()) {
-                        Random.nextInt(BYZ_MAX_ID_TAMPER)
+                    if (tampered > 0 && Database.random.nextBoolean()) {
+                        Database.random.nextInt(BYZ_MAX_ID_TAMPER)
                     } else {
                         it.prover
                     },
 
                     // Epoch
-                    if (tampered > 0 && Random.nextBoolean()) {
-                        Random.nextInt(BYZ_MAX_EP_TAMPER)
+                    if (tampered > 0 && Database.random.nextBoolean()) {
+                        Database.random.nextInt(BYZ_MAX_EP_TAMPER)
                     } else {
                         it.epoch
                     },
 
                     // Signature
-                    if (tampered > 0 && Random.nextBoolean()) {
+                    if (tampered > 0 && Database.random.nextBoolean()) {
                         Base64.getEncoder().encodeToString(
-                            Random.nextBytes(
+                            Database.random.nextBytes(
                                 BYZ_BYTES_TAMPER
                             )
                         )
@@ -327,7 +328,7 @@ suspend fun communicate(info: EpochInfo) {
     println("[EPOCH ${info.epoch}] Received ${responses.size}/${Database.frontend.num} responses: ${responses.filter { !it }.count()} were refused")
 
     // Byzantine Level 0: Create non-existent request
-    if (Database.byzantineLevel >= 0 && Random.nextInt(100) < BYZ_PROB_DUMB) {
+    if (Database.byzantineLevel >= 0 && Database.random.nextInt(100) < BYZ_PROB_DUMB) {
         println("[EPOCH ${info.epoch}] Forging location proof")
 
         val user = info.board.getRandomUser()

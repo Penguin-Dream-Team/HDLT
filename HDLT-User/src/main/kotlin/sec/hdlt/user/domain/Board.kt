@@ -1,7 +1,5 @@
 package sec.hdlt.user.domain
 
-import kotlin.random.Random
-
 class Board {
     private val users = mutableListOf<UserInfo>()
 
@@ -17,7 +15,7 @@ class Board {
     }
 
     fun getRandomUser(): UserInfo {
-        return users[Random.nextInt(users.size)]
+        return users[Database.random.nextInt(users.size)]
     }
 
     fun getAllUsers(): List<UserInfo> {
