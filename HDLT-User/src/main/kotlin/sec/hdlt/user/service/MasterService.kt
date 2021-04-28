@@ -19,12 +19,12 @@ import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 import kotlin.streams.toList
 
-class MasterService(private val serverChannel: ManagedChannel, private val mutex: Mutex = Mutex()) :
-    HDLTMasterGrpcKt.HDLTMasterCoroutineImplBase() {
+class MasterService : HDLTMasterGrpcKt.HDLTMasterCoroutineImplBase() {
+    private val mutex: Mutex = Mutex()
 
     override suspend fun init(request: Master.InitRequest): Master.InitResponse {
-        Database.random = Random(request.randomSeed)
-        Database.numServers = request.serverNum
+        Database.initRandom(request.randomSeed)
+        Database.initServer(locationHost, locationPort, request.serverNum)
 
         return Master.InitResponse.getDefaultInstance()
     }
@@ -48,7 +48,7 @@ class MasterService(private val serverChannel: ManagedChannel, private val mutex
             // Do not activate until second delivery
             //delay(Random.nextLong(MIN_TIME_COM, MAX_TIME_COM) * 1000)
 
-            communicate(info, serverChannel)
+            communicate(info)
         }
 
         return Master.BroadcastEpochResponse.newBuilder().apply {
@@ -58,7 +58,7 @@ class MasterService(private val serverChannel: ManagedChannel, private val mutex
     }
 }
 
-suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
+suspend fun communicate(info: EpochInfo) {
     // Byzantine Level 1: Skip communication
     if (Database.byzantineLevel >= 1 && Random.nextInt(100) < BYZ_PROB_NOT_SEND) {
         return
@@ -70,26 +70,26 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
     // Create request once (will be equal for all gRPC calls)
     val request = User.LocationProofRequest.newBuilder().apply {
         id = if (Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
-            println("Tampering with id")
+            println("[EPOCH ${info.epoch}] Tampering with id")
             Random.nextInt(BYZ_MAX_ID_TAMPER)
         } else {
             Database.id
         }
         epoch = if (Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
-            println("Tampering with epoch")
+            println("[EPOCH ${info.epoch}] Tampering with epoch")
             Random.nextInt(BYZ_MAX_EP_TAMPER)
         } else {
             info.epoch
         }
 
         signature = if (Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
-            println("Tampering with signature")
+            println("[EPOCH ${info.epoch}] Tampering with signature")
             Base64.getEncoder().encodeToString(Random.nextBytes(BYZ_BYTES_TAMPER))
         } else {
             try {
                 sign(Database.key, "${Database.id}${info.epoch}")
             } catch (e: SignatureException) {
-                println("Couldn't sign message")
+                println("[EPOCH ${info.epoch}] Couldn't sign message")
                 return
             }
         }
@@ -115,25 +115,25 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 } catch (e: StatusException) {
                     when (e.status.code) {
                         Status.CANCELLED.code -> {
-                            println("Responder detected invalid signature")
+                            println("[EPOCH ${info.epoch} PROVER ${user.id}] Prover detected invalid signature")
                         }
                         Status.UNAUTHENTICATED.code -> {
-                            println("Responder couldn't deliver message")
+                            println("[EPOCH ${info.epoch} PROVER ${user.id}] Prover couldn't deliver message")
                         }
                         Status.INVALID_ARGUMENT.code -> {
-                            println("Responder is in different epoch")
+                            println("[EPOCH ${info.epoch} PROVER ${user.id}] Prover is in different epoch")
                         }
                         Status.DEADLINE_EXCEEDED.code -> {
-                            println("Responder took too long to answer")
+                            println("[EPOCH ${info.epoch} PROVER ${user.id}] Prover took too long to answer")
                         }
                         else -> {
-                            println("Unknown error"); }
+                            println("[EPOCH ${info.epoch} PROVER ${user.id}] Unknown error"); }
                     }
 
                     userChannel.shutdownNow()
                     return@launch
                 } catch (e: Exception) {
-                    println("UNKNOWN EXCEPTION")
+                    println("[EPOCH ${info.epoch} PROVER ${user.id}] UNKNOWN EXCEPTION")
                     userChannel.shutdownNow()
                     return@launch
                 }
@@ -149,13 +149,13 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                     ) {
                         return@launch
                     } else if (user.id != response.proverId || Database.id != response.requesterId) {
-                        println("User ids do not match")
+                        println("[EPOCH ${info.epoch} PROVER ${user.id}] User ids do not match")
                         return@launch
                     } else if (info.epoch != response.epoch) {
-                        println("User is in different epoch")
+                        println("[EPOCH ${info.epoch} PROVER ${user.id}] Prover is in different epoch")
                         return@launch
                     } else if (!info.position.isNear(info.board.getUserCoords(user.id))) {
-                        println("User is far")
+                        println("[EPOCH ${info.epoch} PROVER ${user.id}] Prover is far")
                         return@launch
                     }
 
@@ -167,15 +167,15 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                                 response.signature
                             )
                         ) {
-                            println("Invalid signature detected")
+                            println("[EPOCH ${info.epoch} PROVER ${user.id}] Invalid signature detected")
                             userChannel.shutdownNow()
                             return@launch
                         }
                     } catch (e: SignatureException) {
-                        println("Invalid signature detected")
+                        println("[EPOCH ${info.epoch} PROVER ${user.id}] Invalid signature detected")
                         return@launch
                     } catch (e: IllegalArgumentException) {
-                        println("Invalid base64 detected")
+                        println("[EPOCH ${info.epoch} PROVER ${user.id}] Invalid base64 detected")
                         return@launch
                     }
 
@@ -200,7 +200,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
 
     // Byzantine Level 2: Tamper with fields
     val report: ReportInfo = if (Database.byzantineLevel >= 2 && Random.nextInt(100) < BYZ_PROB_TAMPER) {
-        println("Tampering with request to server fields")
+        println("[EPOCH ${info.epoch}] Tampering with request to server fields")
         var tampered = BYZ_MAX_TIMES_TAMPER
 
         ReportInfo(
@@ -250,7 +250,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                 try {
                     sign(Database.key, "${Database.id}${info.epoch}${info.position}")
                 } catch (e: SignatureException) {
-                    println("Couldn't sign message")
+                    println("[EPOCH ${info.epoch}] Couldn't sign message")
                     return
                 }
             },
@@ -304,7 +304,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
             try {
                 sign(Database.key, "${Database.id}${info.epoch}${info.position}")
             } catch (e: SignatureException) {
-                println("Couldn't sign message")
+                println("[EPOCH ${info.epoch}] Couldn't sign message")
                 return
             },
 
@@ -323,21 +323,12 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
     }.build()
 
     // Send request to server
-    val serverStub = LocationGrpcKt.LocationCoroutineStub(serverChannel)
-
-    try {
-        if (serverStub.locationReport(serverRequest).ack) {
-            println("Request was OK")
-        } else {
-            println("BUSTED BY THE SERVER")
-        }
-    } catch (e: StatusException) {
-        println("Server error when submitting report")
-    }
+    val responses = Database.frontend.submitReport(serverRequest)
+    println("[EPOCH ${info.epoch}] Received ${responses.size}/${Database.frontend.num} responses: ${responses.filter { !it }.count()} were refused")
 
     // Byzantine Level 0: Create non-existent request
     if (Database.byzantineLevel >= 0 && Random.nextInt(100) < BYZ_PROB_DUMB) {
-        println("Forging location proof")
+        println("[EPOCH ${info.epoch}] Forging location proof")
 
         val user = info.board.getRandomUser()
 
@@ -355,7 +346,7 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
             try {
                 sign(Database.key, "${Database.id}${info.epoch}${user.coords}")
             } catch (e: SignatureException) {
-                println("Couldn't sign message")
+                println("[EPOCH ${info.epoch}] Couldn't sign message")
                 return
             },
 
@@ -374,28 +365,22 @@ suspend fun communicate(info: EpochInfo, serverChannel: ManagedChannel) {
                     try {
                         sign(Database.key, "${user.id}${Database.id}${info.epoch}")
                     } catch (e: SignatureException) {
-                        println("Couldn't sign message")
+                        println("[EPOCH ${info.epoch}] Couldn't sign message")
                         return
                     }
                 )
             )
         )
 
-        try {
-            if (serverStub.locationReport(Report.ReportRequest.newBuilder().apply {
-                    val secret = generateKey()
-                    val messageNonce = generateNonce()
-                    val serverCert = Database.serverCert
-                    key = asymmetricCipher(serverCert.publicKey, Base64.getEncoder().encodeToString(secret.encoded))
-                    nonce = Base64.getEncoder().encodeToString(messageNonce)
-                    ciphertext = symmetricCipher(secret, Json.encodeToString(forgedReport), messageNonce)
-                }.build()).ack) {
-                println("Request was OK :O")
-            } else {
-                println("Dumb user busted")
-            }
-        } catch (e: StatusException) {
-            println("Server error on request forging")
-        }
+        val responses = Database.frontend.submitReport(Report.ReportRequest.newBuilder().apply {
+            val secret = generateKey()
+            val messageNonce = generateNonce()
+            val serverCert = Database.serverCert
+            key = asymmetricCipher(serverCert.publicKey, Base64.getEncoder().encodeToString(secret.encoded))
+            nonce = Base64.getEncoder().encodeToString(messageNonce)
+            ciphertext = symmetricCipher(secret, Json.encodeToString(forgedReport), messageNonce)
+        }.build())
+
+        println("[EPOCH ${info.epoch}]Received ${responses.size}/${Database.frontend.num} responses: Dumb user accepted by ${responses.filter { !it }.count()} servers")
     }
 }

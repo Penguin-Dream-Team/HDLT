@@ -1,6 +1,5 @@
 package sec.hdlt.user
 
-import io.grpc.ManagedChannelBuilder
 import io.grpc.ServerBuilder
 import io.grpc.StatusException
 import kotlinx.coroutines.GlobalScope
@@ -8,7 +7,6 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import sec.hdlt.protos.server.LocationGrpcKt
 import sec.hdlt.protos.server.Report
 import sec.hdlt.user.domain.Database
 import sec.hdlt.user.domain.LocationRequest
@@ -27,7 +25,6 @@ import java.util.*
 import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
-import kotlin.random.Random
 
 const val BASE_PORT: Int = 8100
 
@@ -67,6 +64,9 @@ const val BYZ_MAX_EP_TAMPER = 100
 const val BYZ_MAX_COORDS_TAMPER = 100
 const val BYZ_BYTES_TAMPER = 40
 
+var locationHost: String = ""
+var locationPort: Int = 0
+
 fun main(args: Array<String>) {
     val keystoreFile: InputStream = object {}.javaClass.getResourceAsStream(KEYSTORE_FILE)
 
@@ -88,8 +88,8 @@ fun main(args: Array<String>) {
     }
 
     val id = args[0].toInt()
-    val locationHost = args[1]
-    val locationPort: Int = args[2].toInt()
+    locationHost = args[1]
+    locationPort = args[2].toInt()
     val byzantine = args[3].toInt()
 
     if (byzantine < MIN_BYZ_LEV || byzantine > MAX_BYZ_LEV) {
@@ -99,12 +99,6 @@ fun main(args: Array<String>) {
 
     val listen = BASE_PORT + id
 
-    // Initialize connection to Location Server
-    val channel = ManagedChannelBuilder
-        .forAddress(locationHost, locationPort)
-        .usePlaintext()
-        .build()
-
     // Get private key
     val privKey: PrivateKey =
         keyStore.getKey(KEY_ALIAS_PREFIX + id, deriveKey(PASS_PREFIX + id).toCharArray()) as PrivateKey
@@ -113,18 +107,20 @@ fun main(args: Array<String>) {
     val serverCert: Certificate = keyStore.getCertificate(KEY_ALIAS_SERVER)
 
     // Initialize global DB
-    Database(id, keyStore, privKey, serverCert, byzantine, mutableMapOf(), Random, 0)
+    Database.id = id
+    Database.keyStore = keyStore
+    Database.key = privKey
+    Database.serverCert = serverCert
+    Database.byzantineLevel = byzantine
 
     // Initialize server
     val server = ServerBuilder.forPort(listen)
-        .addService(MasterService(channel))
+        .addService(MasterService())
         .addService(UserService())
         .build()
 
     // Allow server queries
     GlobalScope.launch {
-        val stub = LocationGrpcKt.LocationCoroutineStub(channel)
-
         while (true) {
             println("Write request in the form `<epoch> [<user to get>]`")
             val request: List<String>
@@ -142,9 +138,8 @@ fun main(args: Array<String>) {
 
             val epoch = request[0].toInt()
 
-            try {
                 val secret = generateKey()
-                val response = stub.userLocationReport(Report.UserLocationReportRequest.newBuilder().apply {
+                val responses = Database.frontend.getLocationReport(Report.UserLocationReportRequest.newBuilder().apply {
                     val messageNonce = generateNonce()
                     key = asymmetricCipher(serverCert.publicKey, Base64.getEncoder().encodeToString(secret.encoded))
                     nonce = Base64.getEncoder().encodeToString(messageNonce)
@@ -170,26 +165,22 @@ fun main(args: Array<String>) {
                     )
                 }.build())
 
-                if (response.nonce.equals("") || response.ciphertext.equals("")) {
-                    println("No location found for epoch $epoch")
-                    continue
-                }
-
+            val reports: MutableList<LocationResponse> = mutableListOf()
+            for(response: Report.UserLocationReportResponse in responses) {
                 val report: LocationResponse = responseToLocation(secret, response.nonce, response.ciphertext)
-                if (verifySignature(serverCert, "$id$epoch${report.coords}${report.serverInfo}${report.proofs.joinToString { "${it.prover}" }}", report.signature)) {
-                    println("User $id was at ${report.coords} in epoch $epoch")
-                    println("Server Info: ${report.serverInfo}")
+                if (verifySignature(
+                        serverCert,
+                        "$id$epoch${report.coords}${report.serverInfo}${report.proofs.joinToString { "${it.prover}" }}",
+                        report.signature
+                    )
+                ) {
+                    reports.add(report)
                 } else {
                     println("Response was not sent by server")
                 }
-
-            } catch (e: SignatureException) {
-                println("Could not sign message")
-                continue
-            } catch (e: StatusException) {
-                println("Error connecting to server")
-                continue
             }
+
+            // TODO: check if all reports are equal and print to screen
         }
     }
 

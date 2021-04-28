@@ -4,3 +4,4 @@ build/
 logs/
 gradlew
 gradlew.bat
+*.pdf

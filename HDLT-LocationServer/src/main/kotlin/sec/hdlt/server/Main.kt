@@ -144,7 +144,7 @@ class Setup : SetupGrpcKt.SetupCoroutineImplBase() {
 }
 
 class Location : LocationGrpcKt.LocationCoroutineImplBase() {
-    override suspend fun locationReport(request: Report.ReportRequest): Report.ReportResponse {
+    override suspend fun submitLocationReport(request: Report.ReportRequest): Report.ReportResponse {
         val report: LocationReport =
             requestToLocationReport(Database.key, request.nonce, request.key, request.ciphertext)
 
@@ -176,7 +176,7 @@ class Location : LocationGrpcKt.LocationCoroutineImplBase() {
         }.build()
     }
 
-    override suspend fun userLocationReport(request: Report.UserLocationReportRequest): Report.UserLocationReportResponse {
+    override suspend fun getLocationReport(request: Report.UserLocationReportRequest): Report.UserLocationReportResponse {
         val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
         val locationRequest: LocationRequest = requestToLocationRequest(symKey, request.nonce, request.ciphertext)
         val user = locationRequest.id
