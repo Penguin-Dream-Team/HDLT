@@ -3,13 +3,14 @@ package sec.hdlt.master.data
 import sec.hdlt.master.data.grid.GridCell
 import sec.hdlt.master.data.grid.GridDirection
 import sec.hdlt.utils.Colors
+import sec.hdlt.utils.HDLTRandom
 import kotlin.random.Random
 
 class Grid(
     val rows: Int,
     val cols: Int,
     val f: Int,
-    val fLine: Int,
+    val fLine: Int
 ) {
     val cells = mutableMapOf<Int, GridCell>()
 
@@ -19,8 +20,8 @@ class Grid(
     fun initGrid(userCount: Int) {
         repeat(userCount) { id ->
             val user = User(id, byzantine = id >= userCount - f)
-            val x = Random.nextInt(cols)
-            val y = Random.nextInt(rows)
+            val x = HDLTRandom.random.nextInt(cols)
+            val y = HDLTRandom.random.nextInt(rows)
 
             cells[id] = GridCell(x, y, user)
         }
@@ -30,7 +31,7 @@ class Grid(
         cells.forEach { (_, cell) ->
             val direction = getPossibleDirections(cell)
             if (direction.isNotEmpty())
-                cell.move(direction.random())
+                cell.move(direction.random(HDLTRandom.random))
         }
     }
 

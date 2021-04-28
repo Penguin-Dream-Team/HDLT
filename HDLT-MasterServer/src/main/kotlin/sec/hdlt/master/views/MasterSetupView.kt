@@ -13,6 +13,8 @@ import sec.hdlt.master.controllers.SimulatorController
 import sec.hdlt.master.viewmodels.MasterSetupViewModel
 import sec.hdlt.master.viewmodels.doubleOnly
 import sec.hdlt.master.viewmodels.intOnly
+import sec.hdlt.master.viewmodels.longOnly
+import sec.hdlt.utils.HDLTRandom
 import tornadofx.*
 
 class MasterSetupView : View("MasterView | Setup") {
@@ -71,6 +73,15 @@ class MasterSetupView : View("MasterView | Setup") {
                         validateF(it, model.fLine, model.f, "F'")
                     }
                 }
+                field("Random Seed") {
+                    textfield(model.randomSeed) { longOnly() }.validator {
+                        if (it.isNullOrBlank()) {
+                            error("There needs to be a seed")
+                        } else {
+                            null
+                        }
+                    }
+                }
             }
         }
 
@@ -78,6 +89,8 @@ class MasterSetupView : View("MasterView | Setup") {
             button("Finish setup", type = ButtonBar.ButtonData.FINISH) {
                 enableWhen(model.valid)
                 action {
+                    HDLTRandom.initSeed(model.randomSeed.value)
+
                     simulatorController.setupSimulator(model)
                     replaceWith<MasterView>(
                         transition = ViewTransition.Slide(Duration(500.0)),

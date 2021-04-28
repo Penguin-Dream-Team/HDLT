@@ -19,11 +19,13 @@ import sec.hdlt.server.services.RequestValidationService
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
 import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.cert.CertificateException
 import java.util.*
-import java.util.concurrent.ConcurrentHashMap
 import java.util.logging.Logger
 import javax.crypto.SecretKey
 
@@ -36,24 +38,55 @@ const val KEYSTORE_PASS = "KeyStoreServer"
 var F = 0
 var FLINE = 0
 val logger = Logger.getLogger("LocationServer")
+const val BASE_PORT = 7777
 
-fun initDatabaseDaos(): Map<String, AbstractDAO> {
+fun initDatabaseDaos(serverPort: Int): Map<String, AbstractDAO> {
     val dbConfig = DefaultConfiguration()
         .set(SQLDialect.SQLITE)
         .set(HikariDataSource(HikariConfig().apply {
-            jdbcUrl = "jdbc:sqlite:src/main/resources/db/database.sqlite"
+            jdbcUrl = "jdbc:sqlite:src/main/resources/db/database$serverPort.sqlite"
             maximumPoolSize = 15
         }))
     return mapOf("report" to ReportDAO(dbConfig), "userNonces" to NonceDAO(dbConfig))
 }
 
-fun main() {
+fun checkDatabaseFile(serverPort: Int) {
+    val dbFile = Paths.get("src/main/resources/db/database$serverPort.sqlite")
+    if (!Files.exists(dbFile)) {
+        val templateFile = Paths.get("src/main/resources/db/template.database.sqlite")
+        Files.copy(templateFile, dbFile, StandardCopyOption.REPLACE_EXISTING)
+    }
+}
+
+fun main(args: Array<String>) {
+    println("************************")
+    println("* HDLT Location Server *")
+    println("************************")
+
+    if (args.size != 2) {
+        println("Usage: server <server id> <byzantine level>")
+        return
+    }
+
+    val serverId: Int
+    try {
+        serverId = args[0].toInt()
+    } catch (e: NumberFormatException) {
+        println("Invalid server id")
+        return
+    }
+    val serverPort = BASE_PORT + serverId
+
+    checkDatabaseFile(serverPort)
+
+    val byzantineLevel: Int = args[1].toIntOrNull() ?: -1
+
     // Load the keystore
     val keyStore = KeyStore.getInstance("jks")
     val keystoreFile: InputStream = object {}.javaClass.getResourceAsStream(KEYSTORE_FILE)!!
     loadServerSettings()
 
-    val daos = initDatabaseDaos()
+    val daos = initDatabaseDaos(serverPort)
     val reportDao = daos["report"] as ReportDAO
     val nonceDao = daos["userNonces"] as NonceDAO
 
@@ -71,7 +104,7 @@ fun main() {
 
     Database(keyStore, serverKey, reportDao, nonceDao)
 
-    val server = ServerBuilder.forPort(7777).apply {
+    val server = ServerBuilder.forPort(serverPort).apply {
         addService(Location())
         addService(Setup())
         addService(HA())

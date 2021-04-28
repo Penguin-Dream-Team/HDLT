@@ -22,7 +22,7 @@ sourceSets {
 
 flyway {
     driver = "org.sqlite.JDBC"
-    url = "jdbc:sqlite:${project.projectDir}/src/main/resources/db/database.sqlite"
+    url = "jdbc:sqlite:${project.projectDir}/src/main/resources/db/template.database.sqlite"
     baselineOnMigrate = true
     locations = ["filesystem:src/main/resources/db/migrations"]
 }
@@ -34,7 +34,7 @@ jooq {
             generationTool {
                 jdbc {
                     driver = "org.sqlite.JDBC"
-                    url = "jdbc:sqlite:src/main/resources/db/database.sqlite"
+                    url = "jdbc:sqlite:src/main/resources/db/template.database.sqlite"
                 }
                 generator {
                     name = "org.jooq.codegen.JavaGenerator"
@@ -67,6 +67,12 @@ def cleanTask = task("cleanDb") {
     dependsOn(tasks.named("flywayClean"))
 }
 
+def deleteServerDatabasesTask = task("deleteServerDbs") {
+    delete fileTree("src/main/resources/db").matching {
+        include "database*.sqlite"
+    }
+}
+
 def resetTask = task("resetDb") {
     dependsOn(tasks.named("cleanDb"))
     dependsOn(tasks.named("migrateDb"))
@@ -76,3 +82,4 @@ def groupName = "Database"
 migrateTask.group = groupName
 cleanTask.group = groupName
 resetTask.group = groupName
+deleteServerDatabasesTask.group = groupName

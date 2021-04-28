@@ -4,5 +4,5 @@ build/
 logs/
 gradlew
 gradlew.bat
-src/main/resources/db/database.sqlite
+src/main/resources/db/database*.sqlite
 server.settings
