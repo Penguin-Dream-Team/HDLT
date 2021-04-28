@@ -9,6 +9,7 @@ import tornadofx.*
 import kotlin.random.Random
 
 class MasterSetup {
+    val serverCountProperty = SimpleIntegerProperty(SERVER_COUNT)
     val userCountProperty = SimpleIntegerProperty(USER_COUNT)
     val colCountProperty = SimpleIntegerProperty(COL_COUNT)
     val rowCountProperty = SimpleIntegerProperty(ROW_COUNT)
@@ -19,6 +20,7 @@ class MasterSetup {
 }
 
 class MasterSetupViewModel : ItemViewModel<MasterSetup>() {
+    val serverCount = bind(MasterSetup::serverCountProperty)
     val userCount = bind(MasterSetup::userCountProperty)
     val colCount = bind(MasterSetup::colCountProperty)
     val rowCount = bind(MasterSetup::rowCountProperty)

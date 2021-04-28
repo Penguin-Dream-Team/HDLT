@@ -10,6 +10,7 @@ import kotlin.math.roundToLong
 class Simulator(
     rows: Int,
     cols: Int,
+    private val serverCount: Int,
     private val userCount: Int,
     private val epochInterval: Double,
     private val f: Int,
@@ -20,6 +21,7 @@ class Simulator(
     private var currentEpoch: Int = 0
 
     fun initAndLaunch() {
+        broadcaster.initUsers(serverCount)
         grid.initGrid(userCount)
         launch()
     }

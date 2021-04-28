@@ -17,11 +17,12 @@ import kotlin.system.exitProcess
  */
 const val ROW_COUNT = 10
 const val COL_COUNT = 10
+const val SERVER_COUNT = 2
 const val USER_COUNT = 10
 const val EPOCH_INTERVAL = 0.5
 const val F = 3
 const val F_LINE = 2
-const val SERVER_PORT = 7777
+const val BASE_SERVER_PORT = 7777
 
 fun main() {
     launch<MasterApplication>()
@@ -51,10 +52,10 @@ class MasterService(private val channel: ManagedChannel) : Closeable {
     private val logger = LoggerFactory.getLogger("MasterService")
     private val stub = HDLTMasterGrpcKt.HDLTMasterCoroutineStub(channel)
 
-    suspend fun broadcastEpoch(epochh: Int, cells: Map<Int, GridCell>): Boolean {
-        println("Broadcasting epoch ${epochh} with ${cells.size}cells")
+    suspend fun broadcastEpoch(epoch: Int, cells: Map<Int, GridCell>): Boolean {
+        println("Broadcasting epoch $epoch with ${cells.size}cells")
         val request = Master.BroadcastEpochRequest.newBuilder().apply {
-            this.epoch = epochh
+            this.epoch = epoch
             this.addAllCells(cells.map { (id, cell) ->
                 createEpochCell(id, cell.x, cell.y)
             })
@@ -63,6 +64,15 @@ class MasterService(private val channel: ManagedChannel) : Closeable {
         val response = stub.broadcastEpoch(request.build())
         logger.info("Received ok from user ${response.userId}")
         return response.ok
+    }
+
+    suspend fun sendInitSetup(numServers: Int, seed: Long) {
+        val request = Master.InitRequest.newBuilder().apply {
+            this.serverNum = numServers
+            this.randomSeed = seed
+        }
+
+        stub.init(request.build())
     }
 
     private fun createEpochCell(id: Int, x: Int, y: Int): Master.EpochCell? {

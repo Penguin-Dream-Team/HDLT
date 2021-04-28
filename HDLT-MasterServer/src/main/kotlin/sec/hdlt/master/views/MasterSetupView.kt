@@ -5,9 +5,7 @@ import javafx.beans.binding.NumberExpressionBase
 import javafx.beans.property.SimpleIntegerProperty
 import javafx.scene.control.ButtonBar
 import javafx.util.Duration
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import sec.hdlt.master.*
 import sec.hdlt.master.controllers.SimulatorController
 import sec.hdlt.master.viewmodels.MasterSetupViewModel
@@ -16,24 +14,36 @@ import sec.hdlt.master.viewmodels.intOnly
 import sec.hdlt.master.viewmodels.longOnly
 import sec.hdlt.utils.HDLTRandom
 import tornadofx.*
+import java.util.logging.Logger
+import kotlin.random.Random
 
 class MasterSetupView : View("MasterView | Setup") {
     private val simulatorController: SimulatorController by inject()
 
     private val model = MasterSetupViewModel()
 
-    private fun ValidationContext.validate(field: String?, value: NumberExpressionBase, errorMsg: String): ValidationMessage? {
+    private val logger = Logger.getLogger("MasterSetupView")
+
+    private fun ValidationContext.validate(
+        field: String?,
+        value: NumberExpressionBase,
+        errorMsg: String
+    ): ValidationMessage? {
         if (field.isNullOrBlank() || value.lessThanOrEqualTo(0.0).value) {
             return error(errorMsg)
         }
         return null
     }
 
-    private fun ValidationContext.validateF(field: String?, value: SimpleIntegerProperty, maxValue: SimpleIntegerProperty, name: String): ValidationMessage? {
+    private fun ValidationContext.validateF(
+        field: String?,
+        value: SimpleIntegerProperty,
+        maxValue: SimpleIntegerProperty,
+        name: String
+    ): ValidationMessage? {
         return if (field.isNullOrBlank() || value < 0) {
             error("$name cannot be negative")
-        }
-        else if (value >= maxValue && value.value != 0) {
+        } else if (value >= maxValue && value.value != 0) {
             error("$name has to be less than F")
         } else {
             null
@@ -43,6 +53,11 @@ class MasterSetupView : View("MasterView | Setup") {
     override val root = borderpane {
         center = form {
             fieldset {
+                field("Amount of servers") {
+                    textfield(model.serverCount) { intOnly() }.validator {
+                        validate(it, model.serverCount, "The amount of servers needs to be greater than 0")
+                    }
+                }
                 field("Amount of users") {
                     textfield(model.userCount) { intOnly() }.validator {
                         validate(it, model.userCount, "The amount of users needs to be greater than 0")
@@ -98,13 +113,20 @@ class MasterSetupView : View("MasterView | Setup") {
                         sizeToScene = true
                     )
 
-                    CoroutineScope(Dispatchers.Default).launch {
-                        SetupService(
-                            ManagedChannelBuilder
-                                .forAddress("localhost", SERVER_PORT)
-                                .usePlaintext()
-                                .build()
-                        ).broadcastValues(model.f.value, model.fLine.value)
+                    repeat(model.serverCount.value) {
+                        GlobalScope.launch {
+                            try {
+                                logger.info("Sending initialization parameters to server $it")
+                                SetupService(
+                                    ManagedChannelBuilder
+                                        .forAddress("localhost", BASE_SERVER_PORT + it)
+                                        .usePlaintext()
+                                        .build()
+                                ).broadcastValues(model.f.value, model.fLine.value)
+                            } catch (e: Exception) {
+                                logger.severe("Failed to send initialization parameters to user $it")
+                            }
+                        }
                     }
                 }
             }
@@ -112,9 +134,11 @@ class MasterSetupView : View("MasterView | Setup") {
     }
 
     override fun onDock() {
+        model.serverCount.value = SERVER_COUNT
         model.userCount.value = USER_COUNT
         model.rowCount.value = ROW_COUNT
         model.colCount.value = COL_COUNT
         model.epochInterval.value = EPOCH_INTERVAL
+        model.randomSeed.value = Random.nextLong()
     }
 }

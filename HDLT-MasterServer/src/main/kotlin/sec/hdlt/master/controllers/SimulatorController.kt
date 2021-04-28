@@ -21,6 +21,7 @@ class SimulatorController : Controller() {
         simulator = Simulator(
             model.colCount.value,
             model.rowCount.value,
+            model.serverCount.value,
             model.userCount.value,
             model.epochInterval.value,
             model.f.value,
