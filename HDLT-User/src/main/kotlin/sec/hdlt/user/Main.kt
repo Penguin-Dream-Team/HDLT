@@ -27,6 +27,7 @@ import java.util.*
 import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
+import kotlin.random.Random
 
 const val BASE_PORT: Int = 8100
 
@@ -112,7 +113,7 @@ fun main(args: Array<String>) {
     val serverCert: Certificate = keyStore.getCertificate(KEY_ALIAS_SERVER)
 
     // Initialize global DB
-    Database(id, keyStore, privKey, serverCert, byzantine, mutableMapOf())
+    Database(id, keyStore, privKey, serverCert, byzantine, mutableMapOf(), Random, 0)
 
     // Initialize server
     val server = ServerBuilder.forPort(listen)

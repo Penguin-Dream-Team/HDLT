@@ -5,6 +5,7 @@ package sec.hdlt.protos.master;
 option java_package = "sec.hdlt.protos.master";
 
 service HDLTMaster {
+  rpc Init(InitRequest) returns (InitResponse);
   rpc BroadcastEpoch (BroadcastEpochRequest) returns (BroadcastEpochResponse);
 }
 
@@ -23,3 +24,10 @@ message BroadcastEpochResponse {
   int32 user_id = 1;
   bool ok = 2;
 }
+
+message InitRequest {
+  int32 server_num = 1;
+  int64 random_seed = 2;
+}
+
+message InitResponse {}

@@ -22,6 +22,13 @@ import kotlin.streams.toList
 class MasterService(private val serverChannel: ManagedChannel, private val mutex: Mutex = Mutex()) :
     HDLTMasterGrpcKt.HDLTMasterCoroutineImplBase() {
 
+    override suspend fun init(request: Master.InitRequest): Master.InitResponse {
+        Database.random = Random(request.randomSeed)
+        Database.numServers = request.serverNum
+
+        return Master.InitResponse.getDefaultInstance()
+    }
+
     override suspend fun broadcastEpoch(request: Master.BroadcastEpochRequest): Master.BroadcastEpochResponse {
         println("Receiving epoch ${request.epoch}")
 
