@@ -5,3 +5,4 @@ logs/
 gradlew
 gradlew.bat
 *.pdf
+*.sqlite

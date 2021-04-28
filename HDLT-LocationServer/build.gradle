@@ -68,13 +68,16 @@ def cleanTask = task("cleanDb") {
 }
 
 def deleteServerDatabasesTask = task("deleteServerDbs") {
-    delete fileTree("src/main/resources/db").matching {
-        include "database*.sqlite"
+    doLast {
+        delete fileTree("src/main/resources/db").matching {
+            include "database*.sqlite"
+        }
     }
 }
 
 def resetTask = task("resetDb") {
     dependsOn(tasks.named("cleanDb"))
+    dependsOn(tasks.named("deleteServerDbs"))
     dependsOn(tasks.named("migrateDb"))
 }
 
