@@ -6,6 +6,7 @@ import sec.hdlt.server.data.*
 class CommunicationService {
     companion object {
         private val logger = LoggerFactory.getLogger("Communication")
+        private var id = 0
         private var servers = 0
 
         // Common process values
@@ -17,20 +18,21 @@ class CommunicationService {
         private var writtenTimestamp = 0
         private var acknowledgments = 0
 
-        fun initValues(numberOfServers: Int) {
+        fun initValues(serverId: Int, numberOfServers: Int) {
+            id = serverId
             servers = numberOfServers
         }
 
         fun write(report: LocationReport) {
             writtenTimestamp++
             acknowledgments = 0
-            // Trigger Broadcast Write(writtenTimestamp, report)
+            // Trigger BestEffortBroadcast Write(id, writtenTimestamp, report)
         }
 
-        fun deliverWrite(timeStamp: Int, report: LocationReport) {
+        fun deliverWrite(serverId: Int, timeStamp: Int, report: LocationReport) {
             if (timeStamp > timestampValue.first)
                 timestampValue = Pair(timeStamp, report)
-            // Trigger Send Acknowledgments(serverId, true, timeStamp)
+            // Trigger Send PerfectLink Acknowledgments(serverId, true, timeStamp)
         }
 
         fun deliverAcks(serverId: Int, acknlowdgment: Boolean, timeStamp: Int) {
@@ -44,11 +46,11 @@ class CommunicationService {
         fun read() {
             readId++
             readList.clear()
-            // Trigger Broadcast Read(serverId, readId)
+            // Trigger BestEffortBroadcast Read(serverId, readId)
         }
 
         fun deliverRead(serverId: Int, readId: Int) {
-            // Trigger Send Read(serverId, Value, readId, timeStamp, val)
+            // Trigger Send PerfectLink Read(serverId, Value, readId, timeStamp, val)
         }
 
         fun deliverValue(serverId: Int, value: Any, readId: Int, timeStamp: Int, report: LocationReport) {
