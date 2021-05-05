@@ -4,7 +4,6 @@ application.mainClass = "sec.hdlt.ca.MainKt"
 
 dependencies {
     implementation "org.bouncycastle:bcpkix-jdk15on:1.68"
-    implementation project(":protos")
 }
 
 compileKotlin {

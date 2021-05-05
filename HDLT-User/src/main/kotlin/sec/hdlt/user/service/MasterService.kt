@@ -13,15 +13,22 @@ import sec.hdlt.protos.server.*
 import sec.hdlt.protos.user.*
 import sec.hdlt.user.*
 import sec.hdlt.user.domain.*
+import sec.hdlt.user.dto.ProofDto
+import sec.hdlt.user.dto.ReportDto
 import java.security.SignatureException
 import java.util.*
 import java.util.concurrent.TimeUnit
-import kotlin.random.Random
 import kotlin.streams.toList
 
+/**
+ * Class to handle connections from the Master Server (initialization and new epochs)
+ */
 class MasterService : HDLTMasterGrpcKt.HDLTMasterCoroutineImplBase() {
     private val mutex: Mutex = Mutex()
 
+    /**
+     * Deal with Master Server init request, allowing to initialize Random with a seed and the ServerFrontend class
+     */
     override suspend fun init(request: Master.InitRequest): Master.InitResponse {
         Database.initRandom(request.randomSeed)
         Database.initServer(locationHost, locationPort, request.serverNum)
@@ -29,6 +36,9 @@ class MasterService : HDLTMasterGrpcKt.HDLTMasterCoroutineImplBase() {
         return Master.InitResponse.getDefaultInstance()
     }
 
+    /**
+     * Deal with epoch change and new board information
+     */
     override suspend fun broadcastEpoch(request: Master.BroadcastEpochRequest): Master.BroadcastEpochResponse {
         println("Receiving epoch ${request.epoch}")
 
@@ -96,7 +106,7 @@ suspend fun communicate(info: EpochInfo) {
     }.build()
 
     val mutex = Mutex()
-    val proofs = mutableListOf<Proof>()
+    val proofs = mutableListOf<ProofDto>()
 
     // Launch call for each user
     coroutineScope {
@@ -182,7 +192,7 @@ suspend fun communicate(info: EpochInfo) {
 
                     mutex.withLock {
                         proofs.add(
-                            Proof(
+                            ProofDto(
                                 response.requesterId,
                                 response.proverId,
                                 response.epoch,
@@ -200,11 +210,11 @@ suspend fun communicate(info: EpochInfo) {
     }
 
     // Byzantine Level 2: Tamper with fields
-    val report: ReportInfo = if (Database.byzantineLevel >= 2 && Database.random.nextInt(100) < BYZ_PROB_TAMPER) {
+    val report: ReportDto = if (Database.byzantineLevel >= 2 && Database.random.nextInt(100) < BYZ_PROB_TAMPER) {
         println("[EPOCH ${info.epoch}] Tampering with request to server fields")
         var tampered = BYZ_MAX_TIMES_TAMPER
 
-        ReportInfo(
+        ReportDto(
             // Id
             if (tampered > 0 && Database.random.nextBoolean()) {
                 tampered--
@@ -258,7 +268,7 @@ suspend fun communicate(info: EpochInfo) {
 
             // Location proofs
             proofs.stream().map {
-                Proof(
+                ProofDto(
                     // Requester Id
                     if (tampered > 0 && Database.random.nextBoolean()) {
                         tampered--
@@ -296,7 +306,7 @@ suspend fun communicate(info: EpochInfo) {
         )
     } else {
         // Non-byzantine request
-        ReportInfo(
+        ReportDto(
             Database.id,
             info.epoch,
             info.position,
@@ -314,17 +324,8 @@ suspend fun communicate(info: EpochInfo) {
         )
     }
 
-    val serverRequest: Report.ReportRequest = Report.ReportRequest.newBuilder().apply {
-        val secret = generateKey()
-        val messageNonce = generateNonce()
-        val serverCert = Database.serverCert
-        key = asymmetricCipher(serverCert.publicKey, Base64.getEncoder().encodeToString(secret.encoded))
-        nonce = Base64.getEncoder().encodeToString(messageNonce)
-        ciphertext = symmetricCipher(secret, Json.encodeToString(report), messageNonce)
-    }.build()
-
     // Send request to server
-    val responses = Database.frontend.submitReport(serverRequest)
+    val responses = Database.frontend.submitReport(report)
     println("[EPOCH ${info.epoch}] Received ${responses.size}/${Database.frontend.num} responses: ${responses.filter { !it }.count()} were refused")
 
     // Byzantine Level 0: Create non-existent request
@@ -333,7 +334,7 @@ suspend fun communicate(info: EpochInfo) {
 
         val user = info.board.getRandomUser()
 
-        val forgedReport = ReportInfo(
+        val forgedReport = ReportDto(
             // Id
             Database.id,
 
@@ -352,7 +353,7 @@ suspend fun communicate(info: EpochInfo) {
             },
 
             mutableListOf(
-                Proof(
+                ProofDto(
                     // Requester
                     user.id,
 
@@ -373,14 +374,7 @@ suspend fun communicate(info: EpochInfo) {
             )
         )
 
-        val responses = Database.frontend.submitReport(Report.ReportRequest.newBuilder().apply {
-            val secret = generateKey()
-            val messageNonce = generateNonce()
-            val serverCert = Database.serverCert
-            key = asymmetricCipher(serverCert.publicKey, Base64.getEncoder().encodeToString(secret.encoded))
-            nonce = Base64.getEncoder().encodeToString(messageNonce)
-            ciphertext = symmetricCipher(secret, Json.encodeToString(forgedReport), messageNonce)
-        }.build())
+        Database.frontend.submitReport(forgedReport)
 
         println("[EPOCH ${info.epoch}]Received ${responses.size}/${Database.frontend.num} responses: Dumb user accepted by ${responses.filter { !it }.count()} servers")
     }

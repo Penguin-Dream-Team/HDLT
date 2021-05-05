@@ -40,7 +40,11 @@ const val PBKDF2_ITER = 100001
 const val PBKDF2_KEY_SIZE = 512
 
 fun main() {
-    print("SEC HDLT CA\nPath to user keystore: ")
+    println("******************************")
+    println("* HDLT Certificate Authority *")
+    println("******************************")
+    println()
+    print("Path to user keystore: ")
     val userKeyStoreFile = readLine()!!
     print("Path to server keystore: ")
     val serverKeyStoreFile = readLine()!!
@@ -54,18 +58,20 @@ fun main() {
     val haKeyStorePass = readLine()!!
     print("User certificate alias prefix: ")
     val userPrefix = readLine()!!
-    print("Server certificate alias: ")
-    val serverAlias = readLine()!!
+    print("Server certificate alias prefix: ")
+    val serverPrefix = readLine()!!
     print("HA certificate alias: ")
     val haAlias = readLine()!!
-    print("Server key pass: ")
-    val serverKeyPass = readLine()!!
     print("HA key pass: ")
     val haKeyPass = readLine()!!
     print("Number of users to generate: ")
     val nUsers = readLine()!!.toInt()
+    print("Number of servers to generate: ")
+    val nServers = readLine()!!.toInt()
     print("Password prefix of users: ")
-    val passPrefix = readLine()!!
+    val userPassPrefix = readLine()!!
+    print("Password prefix of servers: ")
+    val serverPassPrefix = readLine()!!
     print("Salt to use in passwords: ")
     val salt = readLine()!!
 
@@ -98,15 +104,19 @@ fun main() {
     haKeyStore.load(null, haKeyStorePass.toCharArray())
     haKeyStore.setCertificateEntry("CA", CACert)
 
-    // Generate Server Certificate
-    println("Generating server key")
-    val serverKP: KeyPair = generateKeyPair()
-    val serverCertificate: X509Certificate =
-        signCSR(generateCSR("sec.ist.pt", "HDLT-LocationServer", "SEC LLC", "Lisbon", "Lisbon", "PT", serverKP), CAKey)
-    val serverCertificateChain: Array<X509Certificate> = Array(2) { i -> if (i % 2 == 0) serverCertificate else CACert }
-    serverKeyStore.setKeyEntry(serverAlias, serverKP.private, serverKeyPass.toCharArray(), serverCertificateChain)
-    userKeyStore.setCertificateEntry(serverAlias, serverCertificate)
-    haKeyStore.setCertificateEntry(serverAlias, serverCertificate)
+    // Generate Server Certificates
+    println("Generating server keys")
+    for (i in 0 until nServers) {
+        val serverPass = deriveKey(serverPassPrefix + i, salt)
+        val serverKP: KeyPair = generateKeyPair()
+        val serverCertificate: X509Certificate =
+            signCSR(generateCSR("sec.ist.pt", "HDLT-LocationServer$i", "SEC LLC", "Lisbon", "Lisbon", "PT", serverKP), CAKey)
+        val serverCertificateChain: Array<X509Certificate> = Array(2) { c -> if (c % 2 == 0) serverCertificate else CACert }
+        serverKeyStore.setKeyEntry(serverPrefix + i, serverKP.private, serverPass.toCharArray(), serverCertificateChain)
+        serverKeyStore.setCertificateEntry("cert_$serverPrefix$i", serverCertificate)
+        userKeyStore.setCertificateEntry("cert_$serverPrefix$i", serverCertificate)
+        haKeyStore.setCertificateEntry("cert_$serverPrefix$i", serverCertificate)
+    }
 
     // Generate HA Certificate
     println("Generating HA key")
@@ -120,11 +130,11 @@ fun main() {
     // Generate User Certificates
     println("Generating user keys")
     for (i in 0 until nUsers) {
-        val userPass = deriveKey(passPrefix + i, salt)
+        val userPass = deriveKey(userPassPrefix + i, salt)
         val userKP: KeyPair = generateKeyPair()
         val userCertificate: X509Certificate =
             signCSR(generateCSR("sec.ist.pt", "HDLT-User$i", "SEC LLC", "Lisbon", "Lisbon", "PT", userKP), CAKey)
-        val userCertificateChain: Array<X509Certificate> = Array(2) { i -> if (i % 2 == 0) userCertificate else CACert }
+        val userCertificateChain: Array<X509Certificate> = Array(2) { c -> if (c % 2 == 0) userCertificate else CACert }
         userKeyStore.setKeyEntry(userPrefix + i, userKP.private, userPass.toCharArray(), userCertificateChain)
         userKeyStore.setCertificateEntry("cert_$userPrefix$i", userCertificate)
         serverKeyStore.setCertificateEntry("cert_$userPrefix$i", userCertificate)
