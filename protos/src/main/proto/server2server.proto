@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package sec.hdlt.protos.server2server;
+
+option java_package = "sec.hdlt.protos.server2server";
+
+service Write {
+  rpc WriteBroadcast (WriteBroadcastRequest) returns (WriteBroadcastResponse);
+  rpc WriteAcknowledgment (WriteAcknowledgmentRequest) returns (WriteAcknowledgmentResponse)
+  rpc WriteReturn (WriteReturnRequest) returns (WriteReturnResponse);
+}
+
+service Read {
+  rpc ReadBroadcast (ReadBroadcastRequest) returns (ReadBroadcastResponse);
+  rpc ReadAcknowledgment (ReadAcknowledgmentRequest) returns (ReadAcknowledgmentResponse)
+  rpc ReadReturn (ReadReturnRequest) returns (ReadReturnResponse);
+}
+
+// LocationReport
+message LocationReport {
+  string key = 1; // Ciphered with server's public key
+  string nonce = 2;
+  string ciphertext = 3;
+}
+
+
+// Write
+
+message WriteBroadcastRequest {
+  int32 id = 1;
+  int32 writtenTimestamp = 2;
+  LocationReport report = 3; // Base64-encoded
+}
+
+message WriteBroadcastResponse {
+  bool ack = 1;
+}
+
+message WriteAcknowledgmentRequest {
+  int32 serverId = 1;
+  bool ack = 2;
+  int32 timeStamp = 3;
+}
+
+message WriteAcknowledgmentResponse {
+  bool ack = 1;
+}
+
+message WriteReturnRequest {}
+
+message WriteReturnResponse {}
+
+
+// Read
+
+message ReadBroadcastRequest {
+  int32 serverId = 1;
+  int32 readId = 2;
+}
+
+message ReadBroadcastResponse {
+  bool ack = 1;
+}
+
+message ReadAcknowledgmentRequest {
+  int32 readId = 1;
+  int32 maxTimeStamp = 2;
+  LocationReport readReport = 3;
+}
+
+message ReadAcknowledgmentResponse {
+  bool ack = 1;
+}
+
+message ReadReturnRequest {
+  LocationReport readValue = 1;
+}
+
+message ReadReturnResponse {}

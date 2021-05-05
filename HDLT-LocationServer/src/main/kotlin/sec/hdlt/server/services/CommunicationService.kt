@@ -2,6 +2,7 @@ package sec.hdlt.server.services
 
 import org.slf4j.LoggerFactory
 import sec.hdlt.server.data.*
+import javax.xml.stream.Location
 
 class CommunicationService {
     companion object {
@@ -18,12 +19,18 @@ class CommunicationService {
         private var writtenTimestamp = 0
         private var acknowledgments = 0
 
+        // Reader process values
+        private var readValue: LocationReport? = null
+        private var reading: Boolean = false
+
         fun initValues(serverId: Int, numberOfServers: Int) {
             id = serverId
             servers = numberOfServers
         }
 
+        // ------------------------------ Write Operations ------------------------------
         fun write(report: LocationReport) {
+            readId++
             writtenTimestamp++
             acknowledgments = 0
             // Trigger BestEffortBroadcast Write(id, writtenTimestamp, report)
@@ -39,13 +46,21 @@ class CommunicationService {
             acknowledgments++
             if (acknowledgments > servers / 2) {
                 acknowledgments = 0
-                // Trigger Write Return
+                if (reading) {
+                    reading = false
+                    // Trigger Read Return (readValue)
+                } else {
+                    // Trigger Write Return
+                }
             }
         }
 
+        // ------------------------------ Read Operations ------------------------------
         fun read() {
             readId++
+            acknowledgments = 0
             readList.clear()
+            reading = true
             // Trigger BestEffortBroadcast Read(serverId, readId)
         }
 
@@ -61,7 +76,7 @@ class CommunicationService {
                     if (pair.first > maxPair.first) maxPair = pair
                 }
                 readList.clear()
-                // Trigger Read Return(maxPair.second)
+                // Trigger BestEffortBroadcast Write(readId, maxPair.first, maxPair.second)
             }
         }
     }
