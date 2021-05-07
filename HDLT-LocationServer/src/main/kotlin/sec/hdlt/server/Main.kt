@@ -115,7 +115,7 @@ fun main(args: Array<String>) {
         return
     }
 
-    val serverKey: PrivateKey = keyStore.getKey("KEY_SERVER_PREFIX$serverId", deriveKey(PASS_PREFIX + serverId).toCharArray()) as PrivateKey
+    val serverKey: PrivateKey = keyStore.getKey("$KEY_SERVER_PREFIX$serverId", deriveKey(PASS_PREFIX + serverId).toCharArray()) as PrivateKey
 
     Database(keyStore, serverKey, reportDao, nonceDao)
 
