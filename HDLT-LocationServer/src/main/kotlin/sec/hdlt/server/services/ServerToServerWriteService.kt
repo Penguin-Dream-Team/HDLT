@@ -25,6 +25,8 @@ class ServerToServerWriteService(server: Int, totalServers: Int) : WriteGrpcKt.W
     }
 
     suspend fun writeBroadCast(server: Int, timeStamp: Int, locationReport: LocationReport): Boolean {
+        response = false
+
         val request = Server2Server.WriteBroadcastRequest.newBuilder().apply {
             serverId = server
             writtenTimestamp = timeStamp

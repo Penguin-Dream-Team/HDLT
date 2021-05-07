@@ -17,7 +17,7 @@ class CommunicationService {
 
         // Writer process values
         private var writtenTimestamp = 0
-        private var acknowledgments = 1
+        private var acknowledgments = mutableMapOf<Int, Int>()
 
         // Reader process values
         private var readValue: LocationReport? = null
@@ -39,12 +39,12 @@ class CommunicationService {
 
             readId++
             writtenTimestamp++
-            acknowledgments = 1
+            acknowledgments[writtenTimestamp] = 1
 
             return writeService.writeBroadCast(id, writtenTimestamp, report)
         }
 
-        suspend fun deliverWrite(serverId: Int, timeStamp: Int, report: LocationReport): Triple<Int, Int, Boolean> {
+        fun deliverWrite(serverId: Int, timeStamp: Int, report: LocationReport): Triple<Int, Int, Boolean> {
             println("[EPOCH ${report.epoch}] received a write request from server $serverId")
 
             if (timeStamp > timestampValue.first)
@@ -57,9 +57,9 @@ class CommunicationService {
             println("[EPOCH $epoch] Received a $acknowledgement from server $serverId")
 
             // FIXME Lista de ack por (serverId, timestamp) ??
-            acknowledgments++
-            if (acknowledgments > servers / 2) {
-                acknowledgments = 0
+            acknowledgments[timeStamp] = acknowledgments[timeStamp]!!.inc()
+            if (acknowledgments[timeStamp]!! > servers / 2) {
+                acknowledgments[timeStamp] = 1
                 if (reading) {
                     reading = false
                     readService.readReturn(readValue)
@@ -75,7 +75,7 @@ class CommunicationService {
         // ------------------------------ Read Operations ------------------------------
         suspend fun read() {
             readId++
-            acknowledgments = 1
+            acknowledgments[writtenTimestamp] = 1
             readList.clear()
             reading = true
 
