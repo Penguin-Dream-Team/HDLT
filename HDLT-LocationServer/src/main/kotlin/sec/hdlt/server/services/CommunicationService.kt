@@ -27,14 +27,12 @@ class CommunicationService {
 
         fun initValues(
             serverId: Int,
-            numberOfServers: Int,
-            serverToServerWriteService: ServerToServerWriteService,
-            serverToServerReadService: ServerToServerReadService
+            numberOfServers: Int
         ) {
             id = serverId
             servers = numberOfServers
-            writeService = serverToServerWriteService
-            readService = serverToServerReadService
+            writeService = ServerToServerWriteService(numberOfServers)
+            readService = ServerToServerReadService(numberOfServers)
         }
 
         // ------------------------------ Write Operations ------------------------------
@@ -50,10 +48,11 @@ class CommunicationService {
             if (timeStamp > timestampValue.first)
                 timestampValue = Pair(timeStamp, report)
 
-            writeService.writeAcknowledgment(id, timeStamp, true)
+            writeService.writeAcknowledgment(serverId, timeStamp, true)
         }
 
-        suspend fun deliverAcks(serverId: Int, acknlowdgment: Boolean, timeStamp: Int) {
+        suspend fun deliverAcks(serverId: Int, timeStamp: Int, acknlowdgment: Boolean) {
+             // FIXME Lista de ack por (serverId, timestamp) ??
             acknowledgments++
             if (acknowledgments > servers / 2) {
                 acknowledgments = 0
@@ -62,7 +61,7 @@ class CommunicationService {
                     readService.readReturn(readValue)
 
                 } else {
-                    writeService.writeReturn()
+                    writeService.writeReturn(timestampValue.second!!)
                 }
             }
         }
@@ -78,10 +77,10 @@ class CommunicationService {
         }
 
         suspend fun deliverRead(serverId: Int, readId: Int) {
-            readService.readAcknowledgment(readId, timestampValue.first, timestampValue.second!!)
+            readService.readAcknowledgment(serverId, readId, timestampValue.first, timestampValue.second!!)
         }
 
-        suspend fun deliverValue(serverId: Int, value: Any, readId: Int, timeStamp: Int, report: LocationReport) {
+        suspend fun deliverValue(serverId: Int, readId: Int, timeStamp: Int, report: LocationReport) {
             readList[serverId] = Pair(timeStamp, report)
             if (readList.size > servers / 2) {
                 var maxPair = readList[0]

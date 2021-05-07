@@ -8,22 +8,16 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import sec.hdlt.protos.server2server.Server2Server
 import sec.hdlt.protos.server2server.WriteGrpcKt
-import sec.hdlt.protos.user.LocationProofGrpcKt
-import sec.hdlt.protos.user.User
 import sec.hdlt.server.MAX_GRPC_TIME
-import sec.hdlt.server.domain.Database
 import sec.hdlt.server.domain.LocationReport
-import sec.hdlt.server.domain.ServerInfo
-import sec.hdlt.server.sign
-import java.security.SignatureException
 import java.util.*
 import java.util.concurrent.TimeUnit
 
-class ServerToServerWriteService {
-    private var servers = mutableListOf<ServerInfo>()
+class ServerToServerWriteService(totalServers: Int) : WriteGrpcKt.WriteCoroutineImplBase() {
+    private var servers: Int = 0
 
-    constructor(serversList: List<ServerInfo>) {
-        servers.addAll(serversList)
+    init {
+        servers = totalServers
     }
 
     suspend fun writeBroadCast(server: Int, timeStamp: Int, locationReport: LocationReport) {
@@ -46,10 +40,10 @@ class ServerToServerWriteService {
 
         // Launch call for each server
         coroutineScope {
-            for (server: ServerInfo in servers) {
+            for (server: Int in 0 until servers) {
                 launch {
                     val serverChannel: ManagedChannel =
-                        ManagedChannelBuilder.forAddress("localhost", server.port).usePlaintext().build()
+                        ManagedChannelBuilder.forAddress("localhost", server).usePlaintext().build()
                     val serverStub = WriteGrpcKt.WriteCoroutineStub(serverChannel)
                         .withDeadlineAfter(MAX_GRPC_TIME, TimeUnit.SECONDS)
 
@@ -62,19 +56,19 @@ class ServerToServerWriteService {
                         when (e.status.code) {
                             // TODO STATUS
                             Status.UNAUTHENTICATED.code -> {
-                                println("[SERVER ${server.id}] Prover couldn't deliver message")
+                                println("[SERVER $server] Prover couldn't deliver message")
                             }
                             Status.DEADLINE_EXCEEDED.code -> {
-                                println("[SERVER ${server.id}] Server took too long to answer")
+                                println("[SERVER $server] Server took too long to answer")
                             }
                             else -> {
-                                println("[SERVER ${server.id}] Unknown error"); }
+                                println("[SERVER $server] Unknown error"); }
                         }
 
                         serverChannel.shutdownNow()
                         return@launch
                     } catch (e: Exception) {
-                        println("[SERVER ${server.id}] UNKNOWN EXCEPTION")
+                        println("[SERVER ${server}] UNKNOWN EXCEPTION")
                         e.printStackTrace()
                         serverChannel.shutdownNow()
                         return@launch
@@ -100,10 +94,10 @@ class ServerToServerWriteService {
 
         // Launch call for each server
         coroutineScope {
-            for (server: ServerInfo in servers) {
+            for (server: Int in 0 until servers) {
                 launch {
                     val serverChannel: ManagedChannel =
-                        ManagedChannelBuilder.forAddress("localhost", server.port).usePlaintext().build()
+                        ManagedChannelBuilder.forAddress("localhost", server).usePlaintext().build()
                     val serverStub = WriteGrpcKt.WriteCoroutineStub(serverChannel)
                         .withDeadlineAfter(MAX_GRPC_TIME, TimeUnit.SECONDS)
 
@@ -116,19 +110,19 @@ class ServerToServerWriteService {
                         when (e.status.code) {
                             // TODO STATUS
                             Status.UNAUTHENTICATED.code -> {
-                                println("[SERVER ${server.id}] Prover couldn't deliver message")
+                                println("[SERVER $server] Prover couldn't deliver message")
                             }
                             Status.DEADLINE_EXCEEDED.code -> {
-                                println("[SERVER ${server.id}] Server took too long to answer")
+                                println("[SERVER $server] Server took too long to answer")
                             }
                             else -> {
-                                println("[SERVER ${server.id}] Unknown error"); }
+                                println("[SERVER $server] Unknown error"); }
                         }
 
                         serverChannel.shutdownNow()
                         return@launch
                     } catch (e: Exception) {
-                        println("[SERVER ${server.id}] UNKNOWN EXCEPTION")
+                        println("[SERVER $server] UNKNOWN EXCEPTION")
                         e.printStackTrace()
                         serverChannel.shutdownNow()
                         return@launch
@@ -138,7 +132,7 @@ class ServerToServerWriteService {
         } // Coroutine scope
     }
 
-    suspend fun writeReturn() {
+    suspend fun writeReturn(report: LocationReport) {
         val request = Server2Server.WriteReturnRequest.newBuilder().apply {
             /*signature = try {
                     sign(Database.key, "${Database.id}$epoch")
@@ -150,10 +144,10 @@ class ServerToServerWriteService {
 
         // Launch call for each server
         coroutineScope {
-            for (server: ServerInfo in servers) {
+            for (server: Int in 0 until servers) {
                 launch {
                     val serverChannel: ManagedChannel =
-                        ManagedChannelBuilder.forAddress("localhost", server.port).usePlaintext().build()
+                        ManagedChannelBuilder.forAddress("localhost", server).usePlaintext().build()
                     val serverStub = WriteGrpcKt.WriteCoroutineStub(serverChannel)
                         .withDeadlineAfter(MAX_GRPC_TIME, TimeUnit.SECONDS)
 
@@ -166,19 +160,19 @@ class ServerToServerWriteService {
                         when (e.status.code) {
                             // TODO STATUS
                             Status.UNAUTHENTICATED.code -> {
-                                println("[SERVER ${server.id}] Prover couldn't deliver message")
+                                println("[SERVER $server] Prover couldn't deliver message")
                             }
                             Status.DEADLINE_EXCEEDED.code -> {
-                                println("[SERVER ${server.id}] Server took too long to answer")
+                                println("[SERVER $server] Server took too long to answer")
                             }
                             else -> {
-                                println("[SERVER ${server.id}] Unknown error"); }
+                                println("[SERVER $server] Unknown error"); }
                         }
 
                         serverChannel.shutdownNow()
                         return@launch
                     } catch (e: Exception) {
-                        println("[SERVER ${server.id}] UNKNOWN EXCEPTION")
+                        println("[SERVER $server] UNKNOWN EXCEPTION")
                         e.printStackTrace()
                         serverChannel.shutdownNow()
                         return@launch

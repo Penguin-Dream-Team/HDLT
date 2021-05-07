@@ -10,15 +10,14 @@ import sec.hdlt.protos.server2server.ReadGrpcKt
 import sec.hdlt.protos.server2server.Server2Server
 import sec.hdlt.server.MAX_GRPC_TIME
 import sec.hdlt.server.domain.LocationReport
-import sec.hdlt.server.domain.ServerInfo
 import java.util.*
 import java.util.concurrent.TimeUnit
 
-class ServerToServerReadService {
-    private var servers = mutableListOf<ServerInfo>()
+class ServerToServerReadService(totalServers: Int) : ReadGrpcKt.ReadCoroutineImplBase() {
+    private var servers: Int = 0
 
-    constructor(serversList: List<ServerInfo>) {
-        servers.addAll(serversList)
+    init {
+        servers = totalServers
     }
 
     suspend fun readBroadCast(server: Int, read: Int) {
@@ -36,10 +35,10 @@ class ServerToServerReadService {
 
         // Launch call for each server
         coroutineScope {
-            for (server: ServerInfo in servers) {
+            for (server: Int in 0 until servers) {
                 launch {
                     val serverChannel: ManagedChannel =
-                        ManagedChannelBuilder.forAddress("localhost", server.port).usePlaintext().build()
+                        ManagedChannelBuilder.forAddress("localhost", server).usePlaintext().build()
                     val serverStub = ReadGrpcKt.ReadCoroutineStub(serverChannel)
                         .withDeadlineAfter(MAX_GRPC_TIME, TimeUnit.SECONDS)
 
@@ -52,19 +51,19 @@ class ServerToServerReadService {
                         when (e.status.code) {
                             // TODO STATUS
                             Status.UNAUTHENTICATED.code -> {
-                                println("[SERVER ${server.id}] Prover couldn't deliver message")
+                                println("[SERVER $server] Prover couldn't deliver message")
                             }
                             Status.DEADLINE_EXCEEDED.code -> {
-                                println("[SERVER ${server.id}] Server took too long to answer")
+                                println("[SERVER $server] Server took too long to answer")
                             }
                             else -> {
-                                println("[SERVER ${server.id}] Unknown error"); }
+                                println("[SERVER $server] Unknown error"); }
                         }
 
                         serverChannel.shutdownNow()
                         return@launch
                     } catch (e: Exception) {
-                        println("[SERVER ${server.id}] UNKNOWN EXCEPTION")
+                        println("[SERVER $server] UNKNOWN EXCEPTION")
                         e.printStackTrace()
                         serverChannel.shutdownNow()
                         return@launch
@@ -74,8 +73,9 @@ class ServerToServerReadService {
         } // Coroutine scope
     }
 
-    suspend fun readAcknowledgment(read: Int, timeStamp: Int, locationReport: LocationReport) {
+    suspend fun readAcknowledgment(server: Int, read: Int, timeStamp: Int, locationReport: LocationReport) {
         val request = Server2Server.ReadAcknowledgmentRequest.newBuilder().apply {
+            serverId = server
             readId = read
             maxTimeStamp = timeStamp
             readReport = Server2Server.LocationReport.newBuilder().apply {
@@ -94,10 +94,10 @@ class ServerToServerReadService {
 
         // Launch call for each server
         coroutineScope {
-            for (server: ServerInfo in servers) {
+            for (server: Int in 0 until servers) {
                 launch {
                     val serverChannel: ManagedChannel =
-                        ManagedChannelBuilder.forAddress("localhost", server.port).usePlaintext().build()
+                        ManagedChannelBuilder.forAddress("localhost", server).usePlaintext().build()
                     val serverStub = ReadGrpcKt.ReadCoroutineStub(serverChannel)
                         .withDeadlineAfter(MAX_GRPC_TIME, TimeUnit.SECONDS)
 
@@ -110,19 +110,19 @@ class ServerToServerReadService {
                         when (e.status.code) {
                             // TODO STATUS
                             Status.UNAUTHENTICATED.code -> {
-                                println("[SERVER ${server.id}] Prover couldn't deliver message")
+                                println("[SERVER $server] Prover couldn't deliver message")
                             }
                             Status.DEADLINE_EXCEEDED.code -> {
-                                println("[SERVER ${server.id}] Server took too long to answer")
+                                println("[SERVER $server] Server took too long to answer")
                             }
                             else -> {
-                                println("[SERVER ${server.id}] Unknown error"); }
+                                println("[SERVER $server] Unknown error"); }
                         }
 
                         serverChannel.shutdownNow()
                         return@launch
                     } catch (e: Exception) {
-                        println("[SERVER ${server.id}] UNKNOWN EXCEPTION")
+                        println("[SERVER $server] UNKNOWN EXCEPTION")
                         e.printStackTrace()
                         serverChannel.shutdownNow()
                         return@launch
@@ -150,10 +150,10 @@ class ServerToServerReadService {
 
         // Launch call for each server
         coroutineScope {
-            for (server: ServerInfo in servers) {
+            for (server: Int in 0 until servers) {
                 launch {
                     val serverChannel: ManagedChannel =
-                        ManagedChannelBuilder.forAddress("localhost", server.port).usePlaintext().build()
+                        ManagedChannelBuilder.forAddress("localhost", server).usePlaintext().build()
                     val serverStub = ReadGrpcKt.ReadCoroutineStub(serverChannel)
                         .withDeadlineAfter(MAX_GRPC_TIME, TimeUnit.SECONDS)
 
@@ -166,19 +166,19 @@ class ServerToServerReadService {
                         when (e.status.code) {
                             // TODO STATUS
                             Status.UNAUTHENTICATED.code -> {
-                                println("[SERVER ${server.id}] Prover couldn't deliver message")
+                                println("[SERVER $server] Prover couldn't deliver message")
                             }
                             Status.DEADLINE_EXCEEDED.code -> {
-                                println("[SERVER ${server.id}] Server took too long to answer")
+                                println("[SERVER $server] Server took too long to answer")
                             }
                             else -> {
-                                println("[SERVER ${server.id}] Unknown error"); }
+                                println("[SERVER $server] Unknown error"); }
                         }
 
                         serverChannel.shutdownNow()
                         return@launch
                     } catch (e: Exception) {
-                        println("[SERVER ${server.id}] UNKNOWN EXCEPTION")
+                        println("[SERVER $server] UNKNOWN EXCEPTION")
                         e.printStackTrace()
                         serverChannel.shutdownNow()
                         return@launch

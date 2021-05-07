@@ -1,6 +1,5 @@
 group 'sec.hdlt.protos'
 
-
 sourceSets {
     main.kotlin.srcDirs = main.java.srcDirs = [
             'build/generated/source/proto/main/java',

@@ -32,9 +32,7 @@ message WriteBroadcastRequest {
   LocationReport report = 3; // Base64-encoded
 }
 
-message WriteBroadcastResponse {
-  bool ack = 1;
-}
+message WriteBroadcastResponse {}
 
 message WriteAcknowledgmentRequest {
   int32 serverId = 1;
@@ -42,9 +40,7 @@ message WriteAcknowledgmentRequest {
   bool acknowledgment = 3;
 }
 
-message WriteAcknowledgmentResponse {
-  bool ack = 1;
-}
+message WriteAcknowledgmentResponse {}
 
 message WriteReturnRequest {}
 
@@ -58,22 +54,21 @@ message ReadBroadcastRequest {
   int32 readId = 2;
 }
 
-message ReadBroadcastResponse {
-  bool ack = 1;
-}
+message ReadBroadcastResponse {}
 
 message ReadAcknowledgmentRequest {
-  int32 readId = 1;
-  int32 maxTimeStamp = 2;
-  LocationReport readReport = 3;
+  int32 serverId = 1;
+  int32 readId = 2;
+  int32 maxTimeStamp = 3;
+  LocationReport readReport = 4;
 }
 
-message ReadAcknowledgmentResponse {
-  bool ack = 1;
-}
+message ReadAcknowledgmentResponse {}
 
 message ReadReturnRequest {
   LocationReport readValue = 1;
 }
 
-message ReadReturnResponse {}
+message ReadReturnResponse {
+  LocationReport report = 1;
+}

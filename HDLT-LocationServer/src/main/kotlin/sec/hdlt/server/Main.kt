@@ -2,7 +2,7 @@ package sec.hdlt.server
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
-import io.grpc.ServerBuilder
+import io.grpc.*
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -10,12 +10,15 @@ import org.jooq.SQLDialect
 import org.jooq.exception.DataAccessException
 import org.jooq.impl.DefaultConfiguration
 import sec.hdlt.protos.server.*
+import sec.hdlt.protos.server.Server
+import sec.hdlt.protos.server2server.ReadGrpcKt
+import sec.hdlt.protos.server2server.Server2Server
+import sec.hdlt.protos.server2server.WriteGrpcKt
 import sec.hdlt.server.dao.AbstractDAO
 import sec.hdlt.server.dao.NonceDAO
 import sec.hdlt.server.dao.ReportDAO
 import sec.hdlt.server.domain.*
-import sec.hdlt.server.services.LocationReportService
-import sec.hdlt.server.services.RequestValidationService
+import sec.hdlt.server.services.*
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -120,7 +123,11 @@ fun main(args: Array<String>) {
         addService(Location())
         addService(Setup())
         addService(HA())
+        addService(ServerWrite())
+        addService(ServerRead())
     }.build()
+
+    CommunicationService.initValues(serverId, F)
 
     server.start()
     server.awaitTermination()
@@ -176,7 +183,7 @@ class Location : LocationGrpcKt.LocationCoroutineImplBase() {
             proofs = RequestValidationService.getValidProofs(user, epoch, proofs)
 
             if (proofs.isNotEmpty()) {
-                val ack = LocationReportService.storeLocationReport(epoch, user, coordinates, proofs)
+                val ack = LocationReportService.storeLocationReport(report, epoch, user, coordinates, proofs)
                 return Report.ReportResponse.newBuilder().apply {
                     this.ack = ack
                 }.build()
@@ -307,6 +314,48 @@ class HA : HAGrpcKt.HACoroutineImplBase() {
                 ), messageNonce
             )
         }.build()
+    }
+}
+
+class ServerWrite : WriteGrpcKt.WriteCoroutineImplBase() {
+    override suspend fun writeBroadcast(request: Server2Server.WriteBroadcastRequest): Server2Server.WriteBroadcastResponse {
+        // TODO Check Report Content
+        val report = LocationReport(-1, -1, Coordinates(-1, -1), "", mutableListOf())
+
+        CommunicationService.deliverWrite(request.serverId, request.writtenTimestamp, report)
+
+        return Server2Server.WriteBroadcastResponse.getDefaultInstance()
+    }
+
+    override suspend fun writeAcknowledgment(request: Server2Server.WriteAcknowledgmentRequest): Server2Server.WriteAcknowledgmentResponse {
+        CommunicationService.deliverAcks(request.serverId, request.writtenTimestamp, request.acknowledgment)
+
+        return Server2Server.WriteAcknowledgmentResponse.getDefaultInstance()
+    }
+
+    override suspend fun writeReturn(request: Server2Server.WriteReturnRequest): Server2Server.WriteReturnResponse {
+        return super.writeReturn(request)
+    }
+}
+
+class ServerRead : ReadGrpcKt.ReadCoroutineImplBase() {
+    override suspend fun readBroadcast(request: Server2Server.ReadBroadcastRequest): Server2Server.ReadBroadcastResponse {
+        CommunicationService.deliverRead(request.serverId, request.readId)
+
+        return Server2Server.ReadBroadcastResponse.getDefaultInstance()
+    }
+
+    override suspend fun readAcknowledgment(request: Server2Server.ReadAcknowledgmentRequest): Server2Server.ReadAcknowledgmentResponse {
+        // TODO Check Report Content
+        val report = LocationReport(-1, -1, Coordinates(-1, -1), "", mutableListOf())
+
+        CommunicationService.deliverValue(request.serverId, request.readId, request.maxTimeStamp, report)
+
+        return Server2Server.ReadAcknowledgmentResponse.getDefaultInstance()
+    }
+
+    override suspend fun readReturn(request: Server2Server.ReadReturnRequest): Server2Server.ReadReturnResponse {
+        return super.readReturn(request)
     }
 }
 

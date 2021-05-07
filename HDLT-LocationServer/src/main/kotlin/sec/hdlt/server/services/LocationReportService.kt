@@ -9,7 +9,8 @@ class LocationReportService {
     companion object {
         private val logger = LoggerFactory.getLogger("Location")
 
-        fun storeLocationReport(
+        suspend fun storeLocationReport(
+            report: LocationReport,
             epoch: Int,
             user: Int,
             coordinates: Coordinates,
@@ -19,7 +20,8 @@ class LocationReportService {
                 if (Database.reportDAO.hasUserReport(user, epoch)) {
                     throw DuplicateReportException(user, epoch)
                 }
-                Database.reportDAO.saveUserReport(epoch, user, coordinates, proofs)
+                CommunicationService.write(report)
+                //Database.reportDAO.saveUserReport(epoch, user, coordinates, proofs)
                 true
             } catch (ex: HDLTException) {
                 logger.error(ex.message)
