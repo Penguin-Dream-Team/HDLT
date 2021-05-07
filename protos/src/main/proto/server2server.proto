@@ -6,13 +6,13 @@ option java_package = "sec.hdlt.protos.server2server";
 
 service Write {
   rpc WriteBroadcast (WriteBroadcastRequest) returns (WriteBroadcastResponse);
-  rpc WriteAcknowledgment (WriteAcknowledgmentRequest) returns (WriteAcknowledgmentResponse)
+  rpc WriteAcknowledgment (WriteAcknowledgmentRequest) returns (WriteAcknowledgmentResponse);
   rpc WriteReturn (WriteReturnRequest) returns (WriteReturnResponse);
 }
 
 service Read {
   rpc ReadBroadcast (ReadBroadcastRequest) returns (ReadBroadcastResponse);
-  rpc ReadAcknowledgment (ReadAcknowledgmentRequest) returns (ReadAcknowledgmentResponse)
+  rpc ReadAcknowledgment (ReadAcknowledgmentRequest) returns (ReadAcknowledgmentResponse);
   rpc ReadReturn (ReadReturnRequest) returns (ReadReturnResponse);
 }
 
@@ -27,7 +27,7 @@ message LocationReport {
 // Write
 
 message WriteBroadcastRequest {
-  int32 id = 1;
+  int32 serverId = 1;
   int32 writtenTimestamp = 2;
   LocationReport report = 3; // Base64-encoded
 }
@@ -38,8 +38,8 @@ message WriteBroadcastResponse {
 
 message WriteAcknowledgmentRequest {
   int32 serverId = 1;
-  bool ack = 2;
-  int32 timeStamp = 3;
+  int32 writtenTimestamp = 2;
+  bool acknowledgment = 3;
 }
 
 message WriteAcknowledgmentResponse {

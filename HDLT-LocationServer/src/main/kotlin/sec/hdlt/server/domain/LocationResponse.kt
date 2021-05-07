@@ -1,4 +1,4 @@
-package sec.hdlt.server.data
+package sec.hdlt.server.domain
 
 import kotlinx.serialization.Serializable
 

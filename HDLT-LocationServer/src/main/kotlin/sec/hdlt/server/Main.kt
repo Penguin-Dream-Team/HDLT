@@ -13,7 +13,7 @@ import sec.hdlt.protos.server.*
 import sec.hdlt.server.dao.AbstractDAO
 import sec.hdlt.server.dao.NonceDAO
 import sec.hdlt.server.dao.ReportDAO
-import sec.hdlt.server.data.*
+import sec.hdlt.server.domain.*
 import sec.hdlt.server.services.LocationReportService
 import sec.hdlt.server.services.RequestValidationService
 import java.io.File
@@ -35,10 +35,13 @@ const val KEY_SERVER_ALIAS = "hdlt_server"
 const val KEY_SERVER_PASS = "123"
 const val KEYSTORE_FILE = "/server.jks"
 const val KEYSTORE_PASS = "KeyStoreServer"
+
+const val BASE_PORT = 7777
+const val MAX_GRPC_TIME = 60L // seconds
+
 var F = 0
 var FLINE = 0
 val logger = Logger.getLogger("LocationServer")
-const val BASE_PORT = 7777
 
 fun initDatabaseDaos(serverPort: Int): Map<String, AbstractDAO> {
     val dbConfig = DefaultConfiguration()

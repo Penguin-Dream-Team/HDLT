@@ -2,11 +2,10 @@ package sec.hdlt.server.dao
 
 import org.jooq.*
 import org.jooq.impl.DSL
-import org.jooq.types.UInteger
-import sec.hdlt.server.data.Coordinates
-import sec.hdlt.server.data.LocationReport
-import sec.hdlt.server.data.Proof
-import sec.hdlt.server.data.ReportInfo
+import sec.hdlt.server.domain.Coordinates
+import sec.hdlt.server.domain.LocationReport
+import sec.hdlt.server.domain.Proof
+import sec.hdlt.server.domain.ReportInfo
 import sec.hdlt.server.db.database.Tables.PROOFS
 import sec.hdlt.server.db.database.Tables.REPORTS
 import sec.hdlt.server.exceptions.ProofCreationException

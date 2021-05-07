@@ -2,9 +2,9 @@ package sec.hdlt.server.services
 
 import sec.hdlt.server.KEY_HA_ALIAS
 import sec.hdlt.server.KEY_USER_PREFIX
-import sec.hdlt.server.data.Coordinates
-import sec.hdlt.server.data.Database
-import sec.hdlt.server.data.Proof
+import sec.hdlt.server.domain.Coordinates
+import sec.hdlt.server.domain.Database
+import sec.hdlt.server.domain.Proof
 import sec.hdlt.server.verifySignature
 import java.security.SignatureException
 

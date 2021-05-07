@@ -1,14 +1,16 @@
 package sec.hdlt.server.services
 
 import org.slf4j.LoggerFactory
-import sec.hdlt.server.data.*
-import javax.xml.stream.Location
+import sec.hdlt.server.domain.*
 
 class CommunicationService {
     companion object {
         private val logger = LoggerFactory.getLogger("Communication")
         private var id = 0
         private var servers = 0
+
+        private lateinit var writeService: ServerToServerWriteService
+        private lateinit var readService: ServerToServerReadService
 
         // Common process values
         private var timestampValue = Pair<Int, LocationReport?>(0, null)
@@ -23,52 +25,63 @@ class CommunicationService {
         private var readValue: LocationReport? = null
         private var reading: Boolean = false
 
-        fun initValues(serverId: Int, numberOfServers: Int) {
+        fun initValues(
+            serverId: Int,
+            numberOfServers: Int,
+            serverToServerWriteService: ServerToServerWriteService,
+            serverToServerReadService: ServerToServerReadService
+        ) {
             id = serverId
             servers = numberOfServers
+            writeService = serverToServerWriteService
+            readService = serverToServerReadService
         }
 
         // ------------------------------ Write Operations ------------------------------
-        fun write(report: LocationReport) {
+        suspend fun write(report: LocationReport) {
             readId++
             writtenTimestamp++
             acknowledgments = 0
-            // Trigger BestEffortBroadcast Write(id, writtenTimestamp, report)
+
+            writeService.writeBroadCast(id, writtenTimestamp, report)
         }
 
-        fun deliverWrite(serverId: Int, timeStamp: Int, report: LocationReport) {
+        suspend fun deliverWrite(serverId: Int, timeStamp: Int, report: LocationReport) {
             if (timeStamp > timestampValue.first)
                 timestampValue = Pair(timeStamp, report)
-            // Trigger Send PerfectLink Acknowledgments(serverId, true, timeStamp)
+
+            writeService.writeAcknowledgment(id, timeStamp, true)
         }
 
-        fun deliverAcks(serverId: Int, acknlowdgment: Boolean, timeStamp: Int) {
+        suspend fun deliverAcks(serverId: Int, acknlowdgment: Boolean, timeStamp: Int) {
             acknowledgments++
             if (acknowledgments > servers / 2) {
                 acknowledgments = 0
                 if (reading) {
                     reading = false
-                    // Trigger Read Return (readValue)
+                    readService.readReturn(readValue)
+
                 } else {
-                    // Trigger Write Return
+                    writeService.writeReturn()
                 }
             }
         }
 
         // ------------------------------ Read Operations ------------------------------
-        fun read() {
+        suspend fun read() {
             readId++
             acknowledgments = 0
             readList.clear()
             reading = true
-            // Trigger BestEffortBroadcast Read(serverId, readId)
+
+            readService.readBroadCast(id, readId)
         }
 
-        fun deliverRead(serverId: Int, readId: Int) {
-            // Trigger Send PerfectLink Read(serverId, Value, readId, timeStamp, val)
+        suspend fun deliverRead(serverId: Int, readId: Int) {
+            readService.readAcknowledgment(readId, timestampValue.first, timestampValue.second!!)
         }
 
-        fun deliverValue(serverId: Int, value: Any, readId: Int, timeStamp: Int, report: LocationReport) {
+        suspend fun deliverValue(serverId: Int, value: Any, readId: Int, timeStamp: Int, report: LocationReport) {
             readList[serverId] = Pair(timeStamp, report)
             if (readList.size > servers / 2) {
                 var maxPair = readList[0]
@@ -76,7 +89,7 @@ class CommunicationService {
                     if (pair.first > maxPair.first) maxPair = pair
                 }
                 readList.clear()
-                // Trigger BestEffortBroadcast Write(readId, maxPair.first, maxPair.second)
+                writeService.writeBroadCast(readId, maxPair.first, maxPair.second!!)
             }
         }
     }

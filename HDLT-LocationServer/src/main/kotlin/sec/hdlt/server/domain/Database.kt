@@ -1,4 +1,4 @@
-package sec.hdlt.server.data
+package sec.hdlt.server.domain
 
 import sec.hdlt.server.dao.NonceDAO
 import sec.hdlt.server.dao.ReportDAO

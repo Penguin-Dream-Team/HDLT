@@ -1,4 +1,4 @@
-package sec.hdlt.server.data
+package sec.hdlt.server.domain
 
 data class ReportInfo (
     val id: Int,
