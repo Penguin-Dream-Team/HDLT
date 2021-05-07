@@ -1,24 +1,20 @@
 package sec.hdlt.user
 
 import io.grpc.ServerBuilder
-import io.grpc.StatusException
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import sec.hdlt.protos.server.Report
 import sec.hdlt.user.domain.Database
-import sec.hdlt.user.domain.LocationRequest
-import sec.hdlt.user.domain.LocationResponse
+import sec.hdlt.user.dto.LocationRequest
+import sec.hdlt.user.dto.LocationResponse
 import sec.hdlt.user.service.MasterService
 import sec.hdlt.user.service.UserService
 import java.io.IOException
 import java.io.InputStream
 import java.security.KeyStore
 import java.security.PrivateKey
-import java.security.SignatureException
-import java.security.cert.Certificate
 import java.security.cert.CertificateException
 import java.security.spec.KeySpec
 import java.util.*
@@ -29,10 +25,10 @@ import javax.crypto.spec.PBEKeySpec
 const val BASE_PORT: Int = 8100
 
 // KeyStore relative params
-const val KEYSTORE_FILE = "/keystore.jks"
+const val KEYSTORE_FILE = "/user.jks"
 const val KEYSTORE_PASS = "UL764S3C637P4SSW06D"
 const val KEY_ALIAS_PREFIX = "hdlt_user_"
-const val KEY_ALIAS_SERVER = "hdlt_server"
+const val CERT_SERVER_PREFIX = "cert_hdlt_server_"
 
 // Password relative params
 const val PASS_SALT = "secret_salt"
@@ -103,14 +99,10 @@ fun main(args: Array<String>) {
     val privKey: PrivateKey =
         keyStore.getKey(KEY_ALIAS_PREFIX + id, deriveKey(PASS_PREFIX + id).toCharArray()) as PrivateKey
 
-    // Get server key
-    val serverCert: Certificate = keyStore.getCertificate(KEY_ALIAS_SERVER)
-
     // Initialize global DB
     Database.id = id
     Database.keyStore = keyStore
     Database.key = privKey
-    Database.serverCert = serverCert
     Database.byzantineLevel = byzantine
 
     // Initialize server
@@ -138,47 +130,22 @@ fun main(args: Array<String>) {
 
             val epoch = request[0].toInt()
 
-                val secret = generateKey()
-                val responses = Database.frontend.getLocationReport(Report.UserLocationReportRequest.newBuilder().apply {
-                    val messageNonce = generateNonce()
-                    key = asymmetricCipher(serverCert.publicKey, Base64.getEncoder().encodeToString(secret.encoded))
-                    nonce = Base64.getEncoder().encodeToString(messageNonce)
+            val reports = Database.frontend.getLocationReport(
+                LocationRequest(
+                    // User Id
+                    if (request.size == 2) {
+                        request[1].toInt()
+                    } else {
+                        id
+                    },
 
-                    ciphertext = symmetricCipher(
-                        secret, Json.encodeToString(
-                            LocationRequest(
-                                // User Id
-                                if (request.size == 2) {
-                                    request[1].toInt()
-                                } else {
-                                    id
-                                },
+                    // Epoch
+                    epoch,
 
-                                // Epoch
-                                epoch,
-
-                                // Signature
-                                sign(privKey, "${id}${epoch}")
-                            )
-                        ),
-                        messageNonce
-                    )
-                }.build())
-
-            val reports: MutableList<LocationResponse> = mutableListOf()
-            for(response: Report.UserLocationReportResponse in responses) {
-                val report: LocationResponse = responseToLocation(secret, response.nonce, response.ciphertext)
-                if (verifySignature(
-                        serverCert,
-                        "$id$epoch${report.coords}${report.serverInfo}${report.proofs.joinToString { "${it.prover}" }}",
-                        report.signature
-                    )
-                ) {
-                    reports.add(report)
-                } else {
-                    println("Response was not sent by server")
-                }
-            }
+                    // Signature
+                    sign(privKey, "${id}${epoch}")
+                )
+            )
 
             // TODO: check if all reports are equal and print to screen
         }

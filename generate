@@ -5,10 +5,11 @@ UL764S3C637P4SSW06D
 KeyStoreServer
 KeyStoreHA
 hdlt_user_
-hdlt_server
+hdlt_server_
 hdlt_ha
 123
-123
+10
 10
 user_pass_id_
+server_pass_id_
 secret_salt

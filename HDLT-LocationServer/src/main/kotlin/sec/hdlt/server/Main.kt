@@ -25,19 +25,28 @@ import java.nio.file.StandardCopyOption
 import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.cert.CertificateException
+import java.security.spec.KeySpec
 import java.util.*
 import java.util.logging.Logger
 import javax.crypto.SecretKey
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
 
 const val KEY_USER_PREFIX = "cert_hdlt_user_"
 const val KEY_HA_ALIAS = "hdlt_ha"
-const val KEY_SERVER_ALIAS = "hdlt_server"
+const val KEY_SERVER_PREFIX = "hdlt_server_"
+const val CERT_SERVER_PREFIX = "cert_$KEY_SERVER_PREFIX"
 const val KEY_SERVER_PASS = "123"
 const val KEYSTORE_FILE = "/server.jks"
 const val KEYSTORE_PASS = "KeyStoreServer"
 
 const val BASE_PORT = 7777
 const val MAX_GRPC_TIME = 60L // seconds
+
+const val PBKDF2_ITER = 100001
+const val PBKDF2_KEY_SIZE = 512
+const val PASS_PREFIX = "server_pass_id_"
+const val PASS_SALT = "secret_salt"
 
 var F = 0
 var FLINE = 0
@@ -103,7 +112,7 @@ fun main(args: Array<String>) {
         return
     }
 
-    val serverKey: PrivateKey = keyStore.getKey(KEY_SERVER_ALIAS, KEY_SERVER_PASS.toCharArray()) as PrivateKey
+    val serverKey: PrivateKey = keyStore.getKey("KEY_SERVER_PREFIX$serverId", deriveKey(PASS_PREFIX + serverId).toCharArray()) as PrivateKey
 
     Database(keyStore, serverKey, reportDao, nonceDao)
 
@@ -312,4 +321,12 @@ fun requestToLocationRequest(key: SecretKey, nonce: String, ciphertext: String):
 
 fun requestToCoordinatesRequest(key: SecretKey, nonce: String, ciphertext: String): CoordinatesRequest {
     return Json.decodeFromString(symmetricDecipher(key, Base64.getDecoder().decode(nonce), ciphertext))
+}
+
+
+fun deriveKey(password: String): String {
+    val spec: KeySpec = PBEKeySpec(password.toCharArray(), PASS_SALT.toByteArray(), PBKDF2_ITER, PBKDF2_KEY_SIZE)
+    val factory: SecretKeyFactory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1")
+
+    return Base64.getEncoder().encodeToString(factory.generateSecret(spec).encoded)
 }
