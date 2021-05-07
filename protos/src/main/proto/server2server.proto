@@ -6,8 +6,6 @@ option java_package = "sec.hdlt.protos.server2server";
 
 service Write {
   rpc WriteBroadcast (WriteBroadcastRequest) returns (WriteBroadcastResponse);
-  rpc WriteAcknowledgment (WriteAcknowledgmentRequest) returns (WriteAcknowledgmentResponse);
-  rpc WriteReturn (WriteReturnRequest) returns (WriteReturnResponse);
 }
 
 service Read {
@@ -32,19 +30,12 @@ message WriteBroadcastRequest {
   LocationReport report = 3; // Base64-encoded
 }
 
-message WriteBroadcastResponse {}
-
-message WriteAcknowledgmentRequest {
-  int32 serverId = 1;
-  int32 writtenTimestamp = 2;
-  bool acknowledgment = 3;
+message WriteBroadcastResponse {
+  int32 epoch = 1;
+  int32 serverId = 2;
+  int32 writtenTimestamp = 3;
+  bool acknowledgment = 4;
 }
-
-message WriteAcknowledgmentResponse {}
-
-message WriteReturnRequest {}
-
-message WriteReturnResponse {}
 
 
 // Read

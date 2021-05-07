@@ -20,9 +20,11 @@ class LocationReportService {
                 if (Database.reportDAO.hasUserReport(user, epoch)) {
                     throw DuplicateReportException(user, epoch)
                 }
-                CommunicationService.write(report)
-                //Database.reportDAO.saveUserReport(epoch, user, coordinates, proofs)
-                true
+                if (CommunicationService.write(report)) {
+                    Database.reportDAO.saveUserReport(epoch, user, coordinates, proofs)
+                    return true
+                }
+                false
             } catch (ex: HDLTException) {
                 logger.error(ex.message)
                 false

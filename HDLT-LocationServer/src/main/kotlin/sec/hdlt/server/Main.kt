@@ -53,6 +53,7 @@ const val PASS_SALT = "secret_salt"
 
 var F = 0
 var FLINE = 0
+var SERVERS_COUNT = 0
 val logger = Logger.getLogger("LocationServer")
 
 fun initDatabaseDaos(serverPort: Int): Map<String, AbstractDAO> {
@@ -127,7 +128,7 @@ fun main(args: Array<String>) {
         addService(ServerRead())
     }.build()
 
-    CommunicationService.initValues(serverId, F)
+    CommunicationService.initValues(serverId, SERVERS_COUNT)
 
     server.start()
     server.awaitTermination()
@@ -140,6 +141,7 @@ fun loadServerSettings() {
         val split = line.split(" ")
         F = split[0].toInt()
         FLINE = split[1].toInt()
+        SERVERS_COUNT = split[2].toInt()
     } catch (e: Exception) {
         logger.severe("Couldn't load server settings to file")
     }
@@ -149,9 +151,10 @@ class Setup : SetupGrpcKt.SetupCoroutineImplBase() {
     override suspend fun broadcastValues(request: Server.BroadcastValuesRequest): Server.BroadcastValuesResponse {
         F = request.f
         FLINE = request.fLine
+        SERVERS_COUNT = request.serversCount
         try {
             val file = File("server.settings")
-            file.writeText("$F $FLINE")
+            file.writeText("$F $FLINE $SERVERS_COUNT")
         } catch (e: Exception) {
             logger.severe("Couldn't save server settings to file")
         }
@@ -322,19 +325,14 @@ class ServerWrite : WriteGrpcKt.WriteCoroutineImplBase() {
         // TODO Check Report Content
         val report = LocationReport(-1, -1, Coordinates(-1, -1), "", mutableListOf())
 
-        CommunicationService.deliverWrite(request.serverId, request.writtenTimestamp, report)
+        val response = CommunicationService.deliverWrite(request.serverId, request.writtenTimestamp, report)
 
-        return Server2Server.WriteBroadcastResponse.getDefaultInstance()
-    }
-
-    override suspend fun writeAcknowledgment(request: Server2Server.WriteAcknowledgmentRequest): Server2Server.WriteAcknowledgmentResponse {
-        CommunicationService.deliverAcks(request.serverId, request.writtenTimestamp, request.acknowledgment)
-
-        return Server2Server.WriteAcknowledgmentResponse.getDefaultInstance()
-    }
-
-    override suspend fun writeReturn(request: Server2Server.WriteReturnRequest): Server2Server.WriteReturnResponse {
-        return super.writeReturn(request)
+        return Server2Server.WriteBroadcastResponse.newBuilder().apply {
+            epoch = report.epoch
+            this.serverId = response.first
+            writtenTimestamp = response.second
+            acknowledgment = response.third
+        }.build()
     }
 }
 

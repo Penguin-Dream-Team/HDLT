@@ -1,11 +1,9 @@
 package sec.hdlt.server.services
 
-import org.slf4j.LoggerFactory
 import sec.hdlt.server.domain.*
 
 class CommunicationService {
     companion object {
-        private val logger = LoggerFactory.getLogger("Communication")
         private var id = 0
         private var servers = 0
 
@@ -19,7 +17,7 @@ class CommunicationService {
 
         // Writer process values
         private var writtenTimestamp = 0
-        private var acknowledgments = 0
+        private var acknowledgments = 1
 
         // Reader process values
         private var readValue: LocationReport? = null
@@ -31,28 +29,34 @@ class CommunicationService {
         ) {
             id = serverId
             servers = numberOfServers
-            writeService = ServerToServerWriteService(numberOfServers)
-            readService = ServerToServerReadService(numberOfServers)
+            writeService = ServerToServerWriteService(serverId, numberOfServers)
+            readService = ServerToServerReadService(serverId, numberOfServers)
         }
 
         // ------------------------------ Write Operations ------------------------------
-        suspend fun write(report: LocationReport) {
+        suspend fun write(report: LocationReport): Boolean {
+            println("[EPOCH ${report.epoch}] new write from user ${report.id}")
+
             readId++
             writtenTimestamp++
-            acknowledgments = 0
+            acknowledgments = 1
 
-            writeService.writeBroadCast(id, writtenTimestamp, report)
+            return writeService.writeBroadCast(id, writtenTimestamp, report)
         }
 
-        suspend fun deliverWrite(serverId: Int, timeStamp: Int, report: LocationReport) {
+        suspend fun deliverWrite(serverId: Int, timeStamp: Int, report: LocationReport): Triple<Int, Int, Boolean> {
+            println("[EPOCH ${report.epoch}] received a write request from server $serverId")
+
             if (timeStamp > timestampValue.first)
                 timestampValue = Pair(timeStamp, report)
 
-            writeService.writeAcknowledgment(serverId, timeStamp, true)
+            return Triple(id, timeStamp, true)
         }
 
-        suspend fun deliverAcks(serverId: Int, timeStamp: Int, acknlowdgment: Boolean) {
-             // FIXME Lista de ack por (serverId, timestamp) ??
+        suspend fun deliverAcks(epoch: Int, serverId: Int, timeStamp: Int, acknowledgement: Boolean): Boolean {
+            println("[EPOCH $epoch] Received a $acknowledgement from server $serverId")
+
+            // FIXME Lista de ack por (serverId, timestamp) ??
             acknowledgments++
             if (acknowledgments > servers / 2) {
                 acknowledgments = 0
@@ -61,15 +65,17 @@ class CommunicationService {
                     readService.readReturn(readValue)
 
                 } else {
-                    writeService.writeReturn(timestampValue.second!!)
+                    println("[EPOCH $epoch] Received all acknowledgements. Saving report ...")
+                    return true
                 }
             }
+            return false
         }
 
         // ------------------------------ Read Operations ------------------------------
         suspend fun read() {
             readId++
-            acknowledgments = 0
+            acknowledgments = 1
             readList.clear()
             reading = true
 

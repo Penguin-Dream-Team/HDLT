@@ -8,15 +8,18 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import sec.hdlt.protos.server2server.ReadGrpcKt
 import sec.hdlt.protos.server2server.Server2Server
+import sec.hdlt.server.BASE_PORT
 import sec.hdlt.server.MAX_GRPC_TIME
 import sec.hdlt.server.domain.LocationReport
 import java.util.*
 import java.util.concurrent.TimeUnit
 
-class ServerToServerReadService(totalServers: Int) : ReadGrpcKt.ReadCoroutineImplBase() {
+class ServerToServerReadService(server: Int, totalServers: Int) : ReadGrpcKt.ReadCoroutineImplBase() {
+    private var serverId: Int = 0
     private var servers: Int = 0
 
     init {
+        serverId = server
         servers = totalServers
     }
 
@@ -38,7 +41,7 @@ class ServerToServerReadService(totalServers: Int) : ReadGrpcKt.ReadCoroutineImp
             for (server: Int in 0 until servers) {
                 launch {
                     val serverChannel: ManagedChannel =
-                        ManagedChannelBuilder.forAddress("localhost", server).usePlaintext().build()
+                        ManagedChannelBuilder.forAddress("localhost", BASE_PORT + server).usePlaintext().build()
                     val serverStub = ReadGrpcKt.ReadCoroutineStub(serverChannel)
                         .withDeadlineAfter(MAX_GRPC_TIME, TimeUnit.SECONDS)
 
@@ -57,13 +60,13 @@ class ServerToServerReadService(totalServers: Int) : ReadGrpcKt.ReadCoroutineImp
                                 println("[SERVER $server] Server took too long to answer")
                             }
                             else -> {
-                                println("[SERVER $server] Unknown error"); }
+                                println("[SERVER $server] ${e.message}"); }
                         }
 
                         serverChannel.shutdownNow()
                         return@launch
                     } catch (e: Exception) {
-                        println("[SERVER $server] UNKNOWN EXCEPTION")
+                        println("[SERVER $server] ${e.message}")
                         e.printStackTrace()
                         serverChannel.shutdownNow()
                         return@launch
@@ -97,7 +100,7 @@ class ServerToServerReadService(totalServers: Int) : ReadGrpcKt.ReadCoroutineImp
             for (server: Int in 0 until servers) {
                 launch {
                     val serverChannel: ManagedChannel =
-                        ManagedChannelBuilder.forAddress("localhost", server).usePlaintext().build()
+                        ManagedChannelBuilder.forAddress("localhost", BASE_PORT + server).usePlaintext().build()
                     val serverStub = ReadGrpcKt.ReadCoroutineStub(serverChannel)
                         .withDeadlineAfter(MAX_GRPC_TIME, TimeUnit.SECONDS)
 
@@ -116,13 +119,13 @@ class ServerToServerReadService(totalServers: Int) : ReadGrpcKt.ReadCoroutineImp
                                 println("[SERVER $server] Server took too long to answer")
                             }
                             else -> {
-                                println("[SERVER $server] Unknown error"); }
+                                println("[SERVER $server] ${e.message}"); }
                         }
 
                         serverChannel.shutdownNow()
                         return@launch
                     } catch (e: Exception) {
-                        println("[SERVER $server] UNKNOWN EXCEPTION")
+                        println("[SERVER $server] ${e.message}")
                         e.printStackTrace()
                         serverChannel.shutdownNow()
                         return@launch
@@ -153,7 +156,7 @@ class ServerToServerReadService(totalServers: Int) : ReadGrpcKt.ReadCoroutineImp
             for (server: Int in 0 until servers) {
                 launch {
                     val serverChannel: ManagedChannel =
-                        ManagedChannelBuilder.forAddress("localhost", server).usePlaintext().build()
+                        ManagedChannelBuilder.forAddress("localhost", BASE_PORT + server).usePlaintext().build()
                     val serverStub = ReadGrpcKt.ReadCoroutineStub(serverChannel)
                         .withDeadlineAfter(MAX_GRPC_TIME, TimeUnit.SECONDS)
 
@@ -172,13 +175,13 @@ class ServerToServerReadService(totalServers: Int) : ReadGrpcKt.ReadCoroutineImp
                                 println("[SERVER $server] Server took too long to answer")
                             }
                             else -> {
-                                println("[SERVER $server] Unknown error"); }
+                                println("[SERVER $server] ${e.message}"); }
                         }
 
                         serverChannel.shutdownNow()
                         return@launch
                     } catch (e: Exception) {
-                        println("[SERVER $server] UNKNOWN EXCEPTION")
+                        println("[SERVER $server] ${e.message}")
                         e.printStackTrace()
                         serverChannel.shutdownNow()
                         return@launch
