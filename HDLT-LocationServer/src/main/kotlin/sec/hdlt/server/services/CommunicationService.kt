@@ -62,7 +62,7 @@ class CommunicationService {
                 acknowledgments[timeStamp] = 1
                 if (reading) {
                     reading = false
-                    readService.readReturn(readValue)
+                    //readService.readReturn(readValue)
 
                 } else {
                     println("[EPOCH $epoch] Received all acknowledgements. Saving report ...")
@@ -82,8 +82,8 @@ class CommunicationService {
             readService.readBroadCast(id, readId)
         }
 
-        suspend fun deliverRead(serverId: Int, readId: Int) {
-            readService.readAcknowledgment(serverId, readId, timestampValue.first, timestampValue.second!!)
+        suspend fun deliverRead(serverId: Int, readId: Int): Pair<Int, LocationReport> {
+            return Pair(timestampValue.first, timestampValue.second!!)
         }
 
         suspend fun deliverValue(serverId: Int, readId: Int, timeStamp: Int, report: LocationReport) {

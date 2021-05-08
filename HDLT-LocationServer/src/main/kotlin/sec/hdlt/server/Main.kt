@@ -338,22 +338,20 @@ class ServerWrite : WriteGrpcKt.WriteCoroutineImplBase() {
 
 class ServerRead : ReadGrpcKt.ReadCoroutineImplBase() {
     override suspend fun readBroadcast(request: Server2Server.ReadBroadcastRequest): Server2Server.ReadBroadcastResponse {
-        CommunicationService.deliverRead(request.serverId, request.readId)
+        val response = CommunicationService.deliverRead(request.serverId, request.readId)
 
-        return Server2Server.ReadBroadcastResponse.getDefaultInstance()
-    }
+        val report = Server2Server.LocationReport.newBuilder().apply {
+            key = ""
+            nonce = ""
+            ciphertext = ""
+        }.build()
 
-    override suspend fun readAcknowledgment(request: Server2Server.ReadAcknowledgmentRequest): Server2Server.ReadAcknowledgmentResponse {
-        // TODO Check Report Content
-        val report = LocationReport(-1, -1, Coordinates(-1, -1), "", mutableListOf())
-
-        CommunicationService.deliverValue(request.serverId, request.readId, request.maxTimeStamp, report)
-
-        return Server2Server.ReadAcknowledgmentResponse.getDefaultInstance()
-    }
-
-    override suspend fun readReturn(request: Server2Server.ReadReturnRequest): Server2Server.ReadReturnResponse {
-        return super.readReturn(request)
+        return Server2Server.ReadBroadcastResponse.newBuilder().apply {
+            serverId = request.serverId
+            readId = request.readId
+            maxTimeStamp = response.first
+            this.report = report
+        }.build()
     }
 }
 
