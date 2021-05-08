@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
 class ServerToServerWriteService(server: Int, totalServers: Int) : WriteGrpcKt.WriteCoroutineImplBase() {
     private var serverId: Int = 0
     private var servers: Int = 0
-    private var response: Boolean = false
+    private var responses = mutableMapOf<Int, Boolean>()
 
     init {
         serverId = server
@@ -25,7 +25,7 @@ class ServerToServerWriteService(server: Int, totalServers: Int) : WriteGrpcKt.W
     }
 
     suspend fun writeBroadCast(server: Int, timeStamp: Int, locationReport: LocationReport): Boolean {
-        response = false
+        responses[timeStamp] = false
 
         val request = Server2Server.WriteBroadcastRequest.newBuilder().apply {
             serverId = server
@@ -64,7 +64,7 @@ class ServerToServerWriteService(server: Int, totalServers: Int) : WriteGrpcKt.W
                             response.serverId,
                             response.writtenTimestamp,
                             response.acknowledgment
-                        )) updateResponse()
+                        )) updateResponse(timeStamp)
                         serverChannel.shutdownNow()
                     } catch (e: StatusException) {
                         when (e.status.code) {
@@ -91,10 +91,10 @@ class ServerToServerWriteService(server: Int, totalServers: Int) : WriteGrpcKt.W
             } // for loop
         } // Coroutine scope
 
-        return response
+        return responses[timeStamp]!!
     }
 
-    private fun updateResponse() {
-        response = true
+    private fun updateResponse(timeStamp: Int) {
+        responses[timeStamp] = true
     }
 }

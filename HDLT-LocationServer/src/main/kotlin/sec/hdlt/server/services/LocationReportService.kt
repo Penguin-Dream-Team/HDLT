@@ -22,9 +22,8 @@ class LocationReportService {
                 }
                 if (CommunicationService.write(report)) {
                     Database.reportDAO.saveUserReport(epoch, user, coordinates, proofs)
-                    return true
-                }
-                false
+                    true
+                } else false
             } catch (ex: HDLTException) {
                 logger.error(ex.message)
                 false
