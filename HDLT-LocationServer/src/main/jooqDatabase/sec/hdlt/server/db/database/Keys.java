@@ -14,10 +14,12 @@ import sec.hdlt.server.db.database.tables.HaNonces;
 import sec.hdlt.server.db.database.tables.Nonces;
 import sec.hdlt.server.db.database.tables.Proofs;
 import sec.hdlt.server.db.database.tables.Reports;
+import sec.hdlt.server.db.database.tables.UserRequests;
 import sec.hdlt.server.db.database.tables.records.HaNoncesRecord;
 import sec.hdlt.server.db.database.tables.records.NoncesRecord;
 import sec.hdlt.server.db.database.tables.records.ProofsRecord;
 import sec.hdlt.server.db.database.tables.records.ReportsRecord;
+import sec.hdlt.server.db.database.tables.records.UserRequestsRecord;
 
 
 /**
@@ -35,6 +37,7 @@ public class Keys {
     public static final UniqueKey<NoncesRecord> PK_NONCES = Internal.createUniqueKey(Nonces.NONCES, DSL.name("pk_nonces"), new TableField[] { Nonces.NONCES.USER_ID, Nonces.NONCES.NONCE }, true);
     public static final UniqueKey<ProofsRecord> PK_PROOFS = Internal.createUniqueKey(Proofs.PROOFS, DSL.name("pk_proofs"), new TableField[] { Proofs.PROOFS.ID }, true);
     public static final UniqueKey<ReportsRecord> PK_REPORTS = Internal.createUniqueKey(Reports.REPORTS, DSL.name("pk_reports"), new TableField[] { Reports.REPORTS.ID }, true);
+    public static final UniqueKey<UserRequestsRecord> PK_USER_REQUESTS = Internal.createUniqueKey(UserRequests.USER_REQUESTS, DSL.name("pk_user_requests"), new TableField[] { UserRequests.USER_REQUESTS.USER_ID, UserRequests.USER_REQUESTS.TIMESTAMP }, true);
 
     // -------------------------------------------------------------------------
     // FOREIGN KEY definitions

@@ -9,6 +9,7 @@ import sec.hdlt.server.db.database.tables.Nonces;
 import sec.hdlt.server.db.database.tables.Proofs;
 import sec.hdlt.server.db.database.tables.Reports;
 import sec.hdlt.server.db.database.tables.SqliteSequence;
+import sec.hdlt.server.db.database.tables.UserRequests;
 
 
 /**
@@ -41,4 +42,9 @@ public class Tables {
      * The table <code>sqlite_sequence</code>.
      */
     public static final SqliteSequence SQLITE_SEQUENCE = SqliteSequence.SQLITE_SEQUENCE;
+
+    /**
+     * The table <code>user_requests</code>.
+     */
+    public static final UserRequests USER_REQUESTS = UserRequests.USER_REQUESTS;
 }

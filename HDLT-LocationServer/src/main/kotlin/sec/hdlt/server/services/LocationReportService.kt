@@ -4,24 +4,28 @@ import org.slf4j.LoggerFactory
 import sec.hdlt.server.domain.*
 import sec.hdlt.server.exceptions.DuplicateReportException
 import sec.hdlt.server.exceptions.HDLTException
+import sec.hdlt.server.exceptions.SpamException
 
 class LocationReportService {
     companion object {
         private val logger = LoggerFactory.getLogger("Location")
+        private const val REQUESTS_LIMIT: Int = 1000
 
         suspend fun storeLocationReport(
             report: LocationReport,
             epoch: Int,
-            user: Int,
+            userId: Int,
             coordinates: Coordinates,
             proofs: List<Proof>
         ) : Boolean {
+            handleRequests(userId)
+
             return try {
-                if (Database.reportDAO.hasUserReport(user, epoch)) {
-                    throw DuplicateReportException(user, epoch)
+                if (Database.reportDAO.hasUserReport(userId, epoch)) {
+                    throw DuplicateReportException(userId, epoch)
                 }
                 if (CommunicationService.write(report)) {
-                    Database.reportDAO.saveUserReport(epoch, user, coordinates, proofs)
+                    Database.reportDAO.saveUserReport(epoch, userId, coordinates, proofs)
                     true
                 } else false
             } catch (ex: HDLTException) {
@@ -31,6 +35,8 @@ class LocationReportService {
         }
 
         suspend fun getLocationReport(userId: Int, epoch: Int, fLine: Int): LocationResponse? {
+            handleRequests(userId)
+
             return try {
                 val result = CommunicationService.read(userId, epoch, fLine)
                 validateLocationReport(
@@ -82,6 +88,13 @@ class LocationReportService {
 
         private fun getProoferCoordinates(reports: List<LocationReport>, prooferId: Int): Coordinates? {
             return reports.firstOrNull { report -> report.id == prooferId }?.location
+        }
+
+        private fun handleRequests(userId: Int) {
+            Database.requestsDAO.saveUserRequest(userId)
+            if (Database.requestsDAO.getUserRequests(userId) > REQUESTS_LIMIT) {
+                throw SpamException(userId)
+            }
         }
     }
 }

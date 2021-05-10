@@ -16,6 +16,7 @@ import sec.hdlt.server.db.database.tables.Nonces;
 import sec.hdlt.server.db.database.tables.Proofs;
 import sec.hdlt.server.db.database.tables.Reports;
 import sec.hdlt.server.db.database.tables.SqliteSequence;
+import sec.hdlt.server.db.database.tables.UserRequests;
 
 
 /**
@@ -57,6 +58,11 @@ public class DefaultSchema extends SchemaImpl {
     public final SqliteSequence SQLITE_SEQUENCE = SqliteSequence.SQLITE_SEQUENCE;
 
     /**
+     * The table <code>user_requests</code>.
+     */
+    public final UserRequests USER_REQUESTS = UserRequests.USER_REQUESTS;
+
+    /**
      * No further instances allowed
      */
     private DefaultSchema() {
@@ -76,6 +82,7 @@ public class DefaultSchema extends SchemaImpl {
             Nonces.NONCES,
             Proofs.PROOFS,
             Reports.REPORTS,
-            SqliteSequence.SQLITE_SEQUENCE);
+            SqliteSequence.SQLITE_SEQUENCE,
+            UserRequests.USER_REQUESTS);
     }
 }
