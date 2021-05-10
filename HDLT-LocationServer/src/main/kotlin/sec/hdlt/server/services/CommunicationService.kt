@@ -53,7 +53,7 @@ class CommunicationService {
             return Triple(id, timeStamp, true)
         }
 
-        suspend fun deliverAcks(epoch: Int, serverId: Int, timeStamp: Int, acknowledgement: Boolean): Boolean {
+        suspend fun deliverAck(epoch: Int, serverId: Int, timeStamp: Int, acknowledgement: Boolean): Boolean {
             println("[EPOCH $epoch] Received a $acknowledgement from server $serverId")
 
             // FIXME Lista de ack por (serverId, timestamp) ??
@@ -62,6 +62,7 @@ class CommunicationService {
                 acknowledgments[timeStamp] = 1
                 if (reading) {
                     reading = false
+                    // Não sei bem o que fazer com este readReturn
                     //readService.readReturn(readValue)
 
                 } else {
@@ -73,20 +74,34 @@ class CommunicationService {
         }
 
         // ------------------------------ Read Operations ------------------------------
-        suspend fun read() {
+        suspend fun read(userId: Int, epoch: Int, fLine: Int): Pair<Int, Int> {
+            println("[EPOCH $epoch] new read from user $userId")
+
             readId++
             acknowledgments[writtenTimestamp] = 1
             readList.clear()
             reading = true
 
-            readService.readBroadCast(id, readId)
+            return readService.readBroadCast(id, readId, userId, epoch, fLine)
         }
 
-        suspend fun deliverRead(serverId: Int, readId: Int): Pair<Int, LocationReport> {
+        suspend fun deliverRead(serverId: Int, epoch: Int, fLine: Int): Pair<Int, LocationReport> {
+            println("[EPOCH $epoch] received a read request from server $serverId")
+
+            // Não sei se temos de ir buscar o report à base de dados ou basta usar o timestampValue, visto que foi
+            // updated quando este server respondeu a um pedido de write
+            /*val locationResponse = LocationReportService.validateLocationReport(
+                Database.reportDAO.getUserLocationReport(userId, epoch),
+                Database.reportDAO.getEpochReports(epoch),
+                fLine
+            )*/
+
             return Pair(timestampValue.first, timestampValue.second!!)
         }
 
-        suspend fun deliverValue(serverId: Int, readId: Int, timeStamp: Int, report: LocationReport) {
+        suspend fun deliverValue(serverId: Int, readId: Int, timeStamp: Int, report: LocationReport): Boolean {
+            println("[EPOCH ${report.epoch}] Received a value from server $serverId")
+
             readList[serverId] = Pair(timeStamp, report)
             if (readList.size > servers / 2) {
                 var maxPair = readList[0]
@@ -94,8 +109,12 @@ class CommunicationService {
                     if (pair.first > maxPair.first) maxPair = pair
                 }
                 readList.clear()
+
+                println("[EPOCH ${report.epoch}] Received all values. Writing-Back report ...")
                 writeService.writeBroadCast(readId, maxPair.first, maxPair.second!!)
+                return true
             }
+            return false
         }
     }
 }

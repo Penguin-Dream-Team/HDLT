@@ -338,7 +338,7 @@ class ServerWrite : WriteGrpcKt.WriteCoroutineImplBase() {
 
 class ServerRead : ReadGrpcKt.ReadCoroutineImplBase() {
     override suspend fun readBroadcast(request: Server2Server.ReadBroadcastRequest): Server2Server.ReadBroadcastResponse {
-        val response = CommunicationService.deliverRead(request.serverId, request.readId)
+        val response = CommunicationService.deliverRead(request.serverId, request.epoch, request.fLine)
 
         val report = Server2Server.LocationReport.newBuilder().apply {
             key = ""
@@ -349,7 +349,7 @@ class ServerRead : ReadGrpcKt.ReadCoroutineImplBase() {
         return Server2Server.ReadBroadcastResponse.newBuilder().apply {
             serverId = request.serverId
             readId = request.readId
-            maxTimeStamp = response.first
+            timestamp = response.first
             this.report = report
         }.build()
     }

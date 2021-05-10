@@ -59,7 +59,7 @@ class ServerToServerWriteService(server: Int, totalServers: Int) : WriteGrpcKt.W
 
                     try {
                         response = serverStub.writeBroadcast(request)
-                        if (CommunicationService.deliverAcks(
+                        if (CommunicationService.deliverAck(
                             response.epoch,
                             response.serverId,
                             response.writtenTimestamp,

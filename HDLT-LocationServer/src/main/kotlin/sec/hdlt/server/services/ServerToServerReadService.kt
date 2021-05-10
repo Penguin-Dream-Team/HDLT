@@ -12,19 +12,21 @@ import sec.hdlt.server.BASE_PORT
 import sec.hdlt.server.MAX_GRPC_TIME
 import sec.hdlt.server.domain.Coordinates
 import sec.hdlt.server.domain.LocationReport
+import sec.hdlt.server.domain.LocationResponse
 import java.util.*
 import java.util.concurrent.TimeUnit
 
 class ServerToServerReadService(server: Int, totalServers: Int) : ReadGrpcKt.ReadCoroutineImplBase() {
     private var serverId: Int = 0
     private var servers: Int = 0
+    private var responses = mutableMapOf<Int, Pair<Int, Int>>()
 
     init {
         serverId = server
         servers = totalServers
     }
 
-    suspend fun readBroadCast(server: Int, read: Int) {
+    suspend fun readBroadCast(server: Int, read: Int, userId: Int, epoch: Int, fLine: Int): Pair<Int, Int> {
         val request = Server2Server.ReadBroadcastRequest.newBuilder().apply {
             serverId = server
             readId = read
@@ -51,12 +53,12 @@ class ServerToServerReadService(server: Int, totalServers: Int) : ReadGrpcKt.Rea
                     try {
                         response = serverStub.readBroadcast(request)
                         val report = LocationReport(-1, -1, Coordinates(-1, -1), "", mutableListOf())
-                        CommunicationService.deliverValue(
+                        if (CommunicationService.deliverValue(
                                 response.serverId,
                                 response.readId,
-                                response.maxTimeStamp,
-                            report
-                        )
+                                response.timestamp,
+                                report
+                        )) updateResponse(response.readId, response.serverId, report.epoch)
                         serverChannel.shutdownNow()
                     } catch (e: StatusException) {
                         when (e.status.code) {
@@ -82,5 +84,11 @@ class ServerToServerReadService(server: Int, totalServers: Int) : ReadGrpcKt.Rea
                 } // launch coroutine
             } // for loop
         } // Coroutine scope
+
+        return responses[request.readId]!!
+    }
+
+    private fun updateResponse(readId: Int, userId: Int, epoch: Int) {
+        responses[readId] = Pair(userId, epoch)
     }
 }

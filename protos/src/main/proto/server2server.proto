@@ -41,11 +41,13 @@ message WriteBroadcastResponse {
 message ReadBroadcastRequest {
   int32 serverId = 1;
   int32 readId = 2;
+  int32 epoch = 3;
+  int32 fLine = 4;
 }
 
 message ReadBroadcastResponse {
   int32 serverId = 1;
   int32 readId = 2;
-  int32 maxTimeStamp = 3;
+  int32 timestamp = 3;
   LocationReport report = 4;
 }

@@ -30,11 +30,12 @@ class LocationReportService {
             }
         }
 
-        fun getLocationReport(userId: Int, epoch: Int, fLine: Int): LocationResponse? {
+        suspend fun getLocationReport(userId: Int, epoch: Int, fLine: Int): LocationResponse? {
             return try {
+                val result = CommunicationService.read(userId, epoch, fLine)
                 validateLocationReport(
-                    Database.reportDAO.getUserLocationReport(userId, epoch),
-                    Database.reportDAO.getEpochReports(epoch),
+                    Database.reportDAO.getUserLocationReport(result.first, result.second),
+                    Database.reportDAO.getEpochReports(result.second),
                     fLine
                 )
             } catch (ex: HDLTException) {
@@ -51,7 +52,7 @@ class LocationReportService {
             return Database.reportDAO.getUsersAtLocation(epoch, coords)
         }
 
-        private fun validateLocationReport(report: LocationReport, reports: List<LocationReport>, fLine: Int): LocationResponse? {
+        fun validateLocationReport(report: LocationReport, reports: List<LocationReport>, fLine: Int): LocationResponse {
             var rightUsers = 0
             report.proofs.forEach { proof ->
                 val prooverCoordinates = getProoferCoordinates(reports, proof.prover)
