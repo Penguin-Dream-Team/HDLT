@@ -17,6 +17,7 @@ import sec.hdlt.protos.server2server.WriteGrpcKt
 import sec.hdlt.server.dao.AbstractDAO
 import sec.hdlt.server.dao.NonceDAO
 import sec.hdlt.server.dao.ReportDAO
+import sec.hdlt.server.dao.RequestsDAO
 import sec.hdlt.server.domain.*
 import sec.hdlt.server.services.*
 import java.io.File
@@ -63,7 +64,7 @@ fun initDatabaseDaos(serverPort: Int): Map<String, AbstractDAO> {
             jdbcUrl = "jdbc:sqlite:src/main/resources/db/database$serverPort.sqlite"
             maximumPoolSize = 15
         }))
-    return mapOf("report" to ReportDAO(dbConfig), "userNonces" to NonceDAO(dbConfig))
+    return mapOf("report" to ReportDAO(dbConfig), "userNonces" to NonceDAO(dbConfig), "requests" to RequestsDAO(dbConfig))
 }
 
 fun checkDatabaseFile(serverPort: Int) {
@@ -105,6 +106,7 @@ fun main(args: Array<String>) {
     val daos = initDatabaseDaos(serverPort)
     val reportDao = daos["report"] as ReportDAO
     val nonceDao = daos["userNonces"] as NonceDAO
+    val requestsDAO = daos["requests"] as RequestsDAO
 
     try {
         keyStore.load(keystoreFile, KEYSTORE_PASS.toCharArray())
@@ -118,7 +120,7 @@ fun main(args: Array<String>) {
 
     val serverKey: PrivateKey = keyStore.getKey("$KEY_SERVER_PREFIX$serverId", deriveKey(PASS_PREFIX + serverId).toCharArray()) as PrivateKey
 
-    Database(keyStore, serverKey, reportDao, nonceDao)
+    Database(keyStore, serverKey, reportDao, nonceDao, requestsDAO)
 
     val server = ServerBuilder.forPort(serverPort).apply {
         addService(Location())
