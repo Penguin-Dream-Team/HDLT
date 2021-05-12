@@ -1,4 +1,4 @@
-package sec.hdlt.user.service
+package sec.hdlt.user.services
 
 import io.grpc.*
 import kotlinx.coroutines.GlobalScope
@@ -6,8 +6,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import sec.hdlt.protos.master.*
 import sec.hdlt.protos.server.*
 import sec.hdlt.protos.user.*

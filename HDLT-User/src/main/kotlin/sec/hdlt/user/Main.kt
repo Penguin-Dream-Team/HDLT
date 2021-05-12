@@ -5,12 +5,11 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
-import sec.hdlt.protos.server.Report
 import sec.hdlt.user.domain.Database
 import sec.hdlt.user.dto.LocationRequest
 import sec.hdlt.user.dto.LocationResponse
-import sec.hdlt.user.service.MasterService
-import sec.hdlt.user.service.UserService
+import sec.hdlt.user.services.MasterService
+import sec.hdlt.user.services.UserService
 import java.io.IOException
 import java.io.InputStream
 import java.security.KeyStore

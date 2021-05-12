@@ -15,6 +15,7 @@ import sec.hdlt.user.domain.Server
 import sec.hdlt.user.dto.LocationRequest
 import sec.hdlt.user.dto.LocationResponse
 import sec.hdlt.user.dto.ReportDto
+import sec.hdlt.user.services.CommunicationService
 import java.security.SignatureException
 import java.util.*
 
@@ -52,6 +53,7 @@ class ServerFrontend(host: String, port: Int, val num: Int) {
 
                     val response: Report.ReportResponse
                     try {
+                        CommunicationService.write(report)
                         response = serverStub.submitLocationReport(Report.ReportRequest.newBuilder().apply {
                             val secret = generateKey()
                             val messageNonce = generateNonce()
@@ -61,6 +63,8 @@ class ServerFrontend(host: String, port: Int, val num: Int) {
                             nonce = Base64.getEncoder().encodeToString(messageNonce)
                             ciphertext = symmetricCipher(secret, Json.encodeToString(report), messageNonce)
                         }.build())
+
+                        CommunicationService.deliverAck(server.id, report.epoch, response.ack)
                     } catch (e: StatusException) {
                         println("Server error when submitting report")
                         return@launch
@@ -90,6 +94,7 @@ class ServerFrontend(host: String, port: Int, val num: Int) {
                     val serverCert = Database.getServerKey(server.id)
 
                     try {
+                        CommunicationService.read(request.id, request.epoch)
                         response = serverStub.getLocationReport(Report.UserLocationReportRequest.newBuilder().apply {
                             val messageNonce = generateNonce()
 
@@ -118,6 +123,7 @@ class ServerFrontend(host: String, port: Int, val num: Int) {
                             report.signature
                         )
                     ) {
+                        CommunicationService.deliverValue(server.id, report)
                         mutex.withLock {
                             responses.add(report)
                         }

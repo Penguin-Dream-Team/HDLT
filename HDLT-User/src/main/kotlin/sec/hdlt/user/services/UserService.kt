@@ -1,4 +1,4 @@
-package sec.hdlt.user.service
+package sec.hdlt.user.services
 
 import io.grpc.ManagedChannelBuilder
 import io.grpc.Status

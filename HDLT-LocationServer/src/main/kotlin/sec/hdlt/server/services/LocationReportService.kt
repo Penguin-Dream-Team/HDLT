@@ -24,10 +24,8 @@ class LocationReportService {
                 if (Database.reportDAO.hasUserReport(userId, epoch)) {
                     throw DuplicateReportException(userId, epoch)
                 }
-                if (CommunicationService.write(report)) {
-                    Database.reportDAO.saveUserReport(epoch, userId, coordinates, proofs)
-                    true
-                } else false
+                Database.reportDAO.saveUserReport(epoch, userId, coordinates, proofs)
+                true
             } catch (ex: HDLTException) {
                 logger.error(ex.message)
                 false
@@ -38,10 +36,9 @@ class LocationReportService {
             handleRequests(userId)
 
             return try {
-                val result = CommunicationService.read(userId, epoch, fLine)
                 validateLocationReport(
-                    Database.reportDAO.getUserLocationReport(result.first, result.second),
-                    Database.reportDAO.getEpochReports(result.second),
+                    Database.reportDAO.getUserLocationReport(userId, epoch),
+                    Database.reportDAO.getEpochReports(epoch),
                     fLine
                 )
             } catch (ex: HDLTException) {

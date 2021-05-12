@@ -11,7 +11,6 @@ service Setup {
 message BroadcastValuesRequest {
   int32 f = 1;
   int32 fLine = 2;
-  int32 serversCount = 3;
 }
 
 message BroadcastValuesResponse {

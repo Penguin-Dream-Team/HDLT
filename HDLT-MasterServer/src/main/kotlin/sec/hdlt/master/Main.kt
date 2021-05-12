@@ -33,11 +33,10 @@ class SetupService(private val channel: ManagedChannel) : Closeable {
     private val logger = LoggerFactory.getLogger("SetupService")
     private val stub = SetupGrpcKt.SetupCoroutineStub(channel)
 
-    suspend fun broadcastValues(f: Int, fLine: Int, serversCount: Int) {
+    suspend fun broadcastValues(f: Int, fLine: Int) {
         val request = Server.BroadcastValuesRequest.newBuilder().apply {
             this.f = f
             this.fLine = fLine
-            this.serversCount = serversCount
         }
 
         val response = stub.broadcastValues(request.build())

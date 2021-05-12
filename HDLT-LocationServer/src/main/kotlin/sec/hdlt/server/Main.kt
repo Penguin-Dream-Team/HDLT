@@ -11,9 +11,6 @@ import org.jooq.exception.DataAccessException
 import org.jooq.impl.DefaultConfiguration
 import sec.hdlt.protos.server.*
 import sec.hdlt.protos.server.Server
-import sec.hdlt.protos.server2server.ReadGrpcKt
-import sec.hdlt.protos.server2server.Server2Server
-import sec.hdlt.protos.server2server.WriteGrpcKt
 import sec.hdlt.server.dao.AbstractDAO
 import sec.hdlt.server.dao.NonceDAO
 import sec.hdlt.server.dao.ReportDAO
@@ -54,7 +51,6 @@ const val PASS_SALT = "secret_salt"
 
 var F = 0
 var FLINE = 0
-var SERVERS_COUNT = 0
 val logger = Logger.getLogger("LocationServer")
 
 fun initDatabaseDaos(serverPort: Int): Map<String, AbstractDAO> {
@@ -126,11 +122,7 @@ fun main(args: Array<String>) {
         addService(Location())
         addService(Setup())
         addService(HA())
-        addService(ServerWrite())
-        addService(ServerRead())
     }.build()
-
-    CommunicationService.initValues(serverId, SERVERS_COUNT)
 
     server.start()
     server.awaitTermination()
@@ -143,7 +135,6 @@ fun loadServerSettings() {
         val split = line.split(" ")
         F = split[0].toInt()
         FLINE = split[1].toInt()
-        SERVERS_COUNT = split[2].toInt()
     } catch (e: Exception) {
         logger.severe("Couldn't load server settings to file")
     }
@@ -153,10 +144,9 @@ class Setup : SetupGrpcKt.SetupCoroutineImplBase() {
     override suspend fun broadcastValues(request: Server.BroadcastValuesRequest): Server.BroadcastValuesResponse {
         F = request.f
         FLINE = request.fLine
-        SERVERS_COUNT = request.serversCount
         try {
             val file = File("server.settings")
-            file.writeText("$F $FLINE $SERVERS_COUNT")
+            file.writeText("$F $FLINE")
         } catch (e: Exception) {
             logger.severe("Couldn't save server settings to file")
         }
@@ -188,6 +178,8 @@ class Location : LocationGrpcKt.LocationCoroutineImplBase() {
             proofs = RequestValidationService.getValidProofs(user, epoch, proofs)
 
             if (proofs.isNotEmpty()) {
+                println("[EPOCH ${report.epoch}] received a write request from user $user")
+
                 val ack = LocationReportService.storeLocationReport(report, epoch, user, coordinates, proofs)
                 return Report.ReportResponse.newBuilder().apply {
                     this.ack = ack
@@ -218,6 +210,7 @@ class Location : LocationGrpcKt.LocationCoroutineImplBase() {
             return Report.UserLocationReportResponse.getDefaultInstance()
         }
 
+        println("[EPOCH $epoch] received a read request from user $user")
         val locationReport = LocationReportService.getLocationReport(user, epoch, F)
         return if (locationReport != null) {
             locationReport.signature = sign(
@@ -318,41 +311,6 @@ class HA : HAGrpcKt.HACoroutineImplBase() {
                     )
                 ), messageNonce
             )
-        }.build()
-    }
-}
-
-class ServerWrite : WriteGrpcKt.WriteCoroutineImplBase() {
-    override suspend fun writeBroadcast(request: Server2Server.WriteBroadcastRequest): Server2Server.WriteBroadcastResponse {
-        // TODO Check Report Content
-        val report = LocationReport(-1, -1, Coordinates(-1, -1), "", mutableListOf())
-
-        val response = CommunicationService.deliverWrite(request.serverId, request.writtenTimestamp, report)
-
-        return Server2Server.WriteBroadcastResponse.newBuilder().apply {
-            epoch = report.epoch
-            this.serverId = response.first
-            writtenTimestamp = response.second
-            acknowledgment = response.third
-        }.build()
-    }
-}
-
-class ServerRead : ReadGrpcKt.ReadCoroutineImplBase() {
-    override suspend fun readBroadcast(request: Server2Server.ReadBroadcastRequest): Server2Server.ReadBroadcastResponse {
-        val response = CommunicationService.deliverRead(request.serverId, request.epoch, request.fLine)
-
-        val report = Server2Server.LocationReport.newBuilder().apply {
-            key = ""
-            nonce = ""
-            ciphertext = ""
-        }.build()
-
-        return Server2Server.ReadBroadcastResponse.newBuilder().apply {
-            serverId = request.serverId
-            readId = request.readId
-            timestamp = response.first
-            this.report = report
         }.build()
     }
 }
