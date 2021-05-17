@@ -60,7 +60,11 @@ fun initDatabaseDaos(serverPort: Int): Map<String, AbstractDAO> {
             jdbcUrl = "jdbc:sqlite:src/main/resources/db/database$serverPort.sqlite"
             maximumPoolSize = 15
         }))
-    return mapOf("report" to ReportDAO(dbConfig), "userNonces" to NonceDAO(dbConfig), "requests" to RequestsDAO(dbConfig))
+    return mapOf(
+        "report" to ReportDAO(dbConfig),
+        "userNonces" to NonceDAO(dbConfig),
+        "requests" to RequestsDAO(dbConfig)
+    )
 }
 
 fun checkDatabaseFile(serverPort: Int) {
@@ -114,7 +118,8 @@ fun main(args: Array<String>) {
         return
     }
 
-    val serverKey: PrivateKey = keyStore.getKey("$KEY_SERVER_PREFIX$serverId", deriveKey(PASS_PREFIX + serverId).toCharArray()) as PrivateKey
+    val serverKey: PrivateKey =
+        keyStore.getKey("$KEY_SERVER_PREFIX$serverId", deriveKey(PASS_PREFIX + serverId).toCharArray()) as PrivateKey
 
     Database(keyStore, serverKey, reportDao, nonceDao, requestsDAO)
 
@@ -159,8 +164,8 @@ class Setup : SetupGrpcKt.SetupCoroutineImplBase() {
 
 class Location : LocationGrpcKt.LocationCoroutineImplBase() {
     override suspend fun submitLocationReport(request: Report.ReportRequest): Report.ReportResponse {
-        val report: LocationReport =
-            requestToLocationReport(Database.key, request.nonce, request.key, request.ciphertext)
+        val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
+        val report: LocationReport = requestToLocationReport(symKey, request.nonce, request.ciphertext)
 
         val user = report.id
         val epoch = report.epoch
@@ -168,7 +173,14 @@ class Location : LocationGrpcKt.LocationCoroutineImplBase() {
         val sig = report.signature
         var proofs = report.proofs
 
-        if (RequestValidationService.validateSignature(
+        val decipheredNonce = Base64.getDecoder().decode(request.nonce)
+        val validNonce = try {
+            Database.nonceDAO.storeUserNonce(decipheredNonce, user)
+        } catch (e: DataAccessException) {
+            false
+        }
+
+        if (validNonce && RequestValidationService.validateSignature(
                 user,
                 epoch,
                 coordinates,
@@ -182,14 +194,19 @@ class Location : LocationGrpcKt.LocationCoroutineImplBase() {
 
                 val ack = LocationReportService.storeLocationReport(report, epoch, user, coordinates, proofs)
                 return Report.ReportResponse.newBuilder().apply {
-                    this.ack = ack
+                    val messageNonce = generateNonce()
+                    nonce = Base64.getEncoder().encodeToString(messageNonce)
+
+                    ciphertext = symmetricCipher(
+                        symKey,
+                        Json.encodeToString(ack),
+                        messageNonce
+                    )
                 }.build()
             }
         }
 
-        return Report.ReportResponse.newBuilder().apply {
-            ack = false
-        }.build()
+        throw Status.INVALID_ARGUMENT.asException()
     }
 
     override suspend fun getLocationReport(request: Report.UserLocationReportRequest): Report.UserLocationReportResponse {
@@ -207,7 +224,7 @@ class Location : LocationGrpcKt.LocationCoroutineImplBase() {
         }
 
         if (!validNonce || !RequestValidationService.validateSignature(user, epoch, sig)) {
-            return Report.UserLocationReportResponse.getDefaultInstance()
+            throw Status.INVALID_ARGUMENT.asException()
         }
 
         println("[EPOCH $epoch] received a read request from user $user")
@@ -229,7 +246,7 @@ class Location : LocationGrpcKt.LocationCoroutineImplBase() {
                 )
             }.build()
         } else {
-            Report.UserLocationReportResponse.getDefaultInstance()
+            throw Status.NOT_FOUND.asException()
         }
     }
 }
@@ -315,9 +332,8 @@ class HA : HAGrpcKt.HACoroutineImplBase() {
     }
 }
 
-fun requestToLocationReport(key: PrivateKey, nonce: String, encodedKey: String, ciphertext: String): LocationReport {
-    val symKey: SecretKey = asymmetricDecipher(key, encodedKey)
-    return Json.decodeFromString(symmetricDecipher(symKey, Base64.getDecoder().decode(nonce), ciphertext))
+fun requestToLocationReport(key: SecretKey, nonce: String, ciphertext: String): LocationReport {
+    return Json.decodeFromString(symmetricDecipher(key, Base64.getDecoder().decode(nonce), ciphertext))
 }
 
 fun requestToLocationRequest(key: SecretKey, nonce: String, ciphertext: String): LocationRequest {

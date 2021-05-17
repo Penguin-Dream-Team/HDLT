@@ -160,9 +160,3 @@ fun deriveKey(password: String): String {
 
     return Base64.getEncoder().encodeToString(factory.generateSecret(spec).encoded)
 }
-
-fun responseToLocation(key: SecretKey, nonce: String, ciphertext: String): LocationResponse {
-    val decodedNonce: ByteArray = Base64.getDecoder().decode(nonce)
-    val deciphered = symmetricDecipher(key, decodedNonce, ciphertext)
-    return Json.decodeFromString(deciphered)
-}
