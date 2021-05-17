@@ -1,14 +1,18 @@
 package sec.hdlt.user.services
 
-import io.grpc.*
+import io.grpc.ManagedChannel
+import io.grpc.ManagedChannelBuilder
+import io.grpc.Status
+import io.grpc.StatusException
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import sec.hdlt.protos.master.*
-import sec.hdlt.protos.server.*
-import sec.hdlt.protos.user.*
+import sec.hdlt.protos.master.HDLTMasterGrpcKt
+import sec.hdlt.protos.master.Master
+import sec.hdlt.protos.user.LocationProofGrpcKt
+import sec.hdlt.protos.user.User
 import sec.hdlt.user.*
 import sec.hdlt.user.domain.*
 import sec.hdlt.user.dto.ProofDto
@@ -29,7 +33,7 @@ class MasterService : HDLTMasterGrpcKt.HDLTMasterCoroutineImplBase() {
      */
     override suspend fun init(request: Master.InitRequest): Master.InitResponse {
         Database.initRandom(request.randomSeed)
-        Database.initServer(locationHost, locationPort, request.serverNum)
+        Database.initServer(locationHost, locationPort, request.serverNum, request.serverByzantine)
 
         return Master.InitResponse.getDefaultInstance()
     }
@@ -53,9 +57,6 @@ class MasterService : HDLTMasterGrpcKt.HDLTMasterCoroutineImplBase() {
         }
 
         GlobalScope.launch {
-            // Do not activate until second delivery
-            //delay(Database.random.nextLong(MIN_TIME_COM, MAX_TIME_COM) * 1000)
-
             communicate(info)
         }
 
@@ -323,8 +324,8 @@ suspend fun communicate(info: EpochInfo) {
     }
 
     // Send request to server
-    val responses = Database.frontend.submitReport(report)
-    println("[EPOCH ${info.epoch}] Received ${responses.size}/${Database.frontend.num} responses: ${responses.filter { !it }.count()} were refused")
+    val response = Database.frontend.submitReport(report)
+    println(if (response) "[EPOCH ${info.epoch}] Report ACCEPTED by majority of servers" else "[EPOCH ${info.epoch}] Report REJECTED by majority of servers")
 
     // Byzantine Level 0: Create non-existent request
     if (Database.byzantineLevel >= 0 && Database.random.nextInt(100) < BYZ_PROB_DUMB) {
@@ -372,8 +373,8 @@ suspend fun communicate(info: EpochInfo) {
             )
         )
 
-        Database.frontend.submitReport(forgedReport)
+        val forgedResponse = Database.frontend.submitReport(forgedReport)
 
-        println("[EPOCH ${info.epoch}]Received ${responses.size}/${Database.frontend.num} responses: Dumb user accepted by ${responses.filter { !it }.count()} servers")
+        println(if (forgedResponse) "[EPOCH ${info.epoch}] FORGED report ACCEPTED by majority of servers" else "[EPOCH ${info.epoch}] FORGED report REJECTED by majority of servers")
     }
 }

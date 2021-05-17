@@ -8,6 +8,10 @@ import sec.hdlt.user.domain.Coordinates
  */
 @Serializable
 data class LocationResponse (val id: Int, val epoch: Int, val coords: Coordinates, val serverInfo: String, val signature: String, val proofs: List<ProofDto>) {
+    override fun toString(): String {
+        return "ID: $id, Epoch: $epoch, Coordinates: $coords, Status: $serverInfo, Proofs: $proofs"
+    }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false

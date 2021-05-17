@@ -34,9 +34,10 @@ object Database {
      * @param host the servers' host
      * @param port the servers' base port
      * @param num the number of servers in the system
+     * @param byzantine the number of byzantine servers in the system
      */
-    fun initServer(host: String, port: Int, num: Int) {
-        frontend = ServerFrontend(host, port, num)
+    fun initServer(host: String, port: Int, num: Int, byzantine: Int) {
+        frontend = ServerFrontend(host, port, num, (num + 2 * byzantine)/2)
     }
 
     /**

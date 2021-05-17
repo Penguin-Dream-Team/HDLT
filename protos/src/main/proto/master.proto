@@ -28,6 +28,7 @@ message BroadcastEpochResponse {
 message InitRequest {
   int32 server_num = 1;
   int64 random_seed = 2;
+  int32 server_byzantine = 3;
 }
 
 message InitResponse {}

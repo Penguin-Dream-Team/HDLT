@@ -6,6 +6,7 @@ import sec.hdlt.user.dto.LocationRequest
 import sec.hdlt.user.dto.LocationResponse
 import sec.hdlt.user.dto.ReportDto
 import sec.hdlt.user.services.CommunicationService
+import java.util.*
 
 /**
  * Class to handle connections to multiple servers at once
@@ -35,7 +36,7 @@ class ServerFrontend(host: String, port: Int, val num: Int, private val quorum: 
         return CommunicationService().submitReport(report, servers, quorum)
     }
 
-    suspend fun getLocationReport(request: LocationRequest): LocationResponse {
+    suspend fun getLocationReport(request: LocationRequest): Optional<LocationResponse> {
         return CommunicationService().getLocationReport(request, servers, quorum)
     }
 }

@@ -3,6 +3,11 @@ package sec.hdlt.server
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import io.grpc.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -28,6 +33,7 @@ import java.security.PrivateKey
 import java.security.cert.CertificateException
 import java.security.spec.KeySpec
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 import java.util.logging.Logger
 import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
@@ -48,6 +54,9 @@ const val PBKDF2_ITER = 100001
 const val PBKDF2_KEY_SIZE = 512
 const val PASS_PREFIX = "server_pass_id_"
 const val PASS_SALT = "secret_salt"
+
+// Communications' variables
+const val NO_REPORT = "NoReport"
 
 var F = 0
 var FLINE = 0
@@ -163,6 +172,8 @@ class Setup : SetupGrpcKt.SetupCoroutineImplBase() {
 }
 
 class Location : LocationGrpcKt.LocationCoroutineImplBase() {
+    val getReportListeners = ConcurrentHashMap<Pair<Int, Int>, Channel<Unit>>()
+
     override suspend fun submitLocationReport(request: Report.ReportRequest): Report.ReportResponse {
         val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
         val report: LocationReport = requestToLocationReport(symKey, request.nonce, request.ciphertext)
@@ -189,6 +200,7 @@ class Location : LocationGrpcKt.LocationCoroutineImplBase() {
         ) {
             proofs = RequestValidationService.getValidProofs(user, epoch, proofs)
 
+            // TODO: Broadcast
             if (proofs.isNotEmpty()) {
                 println("[EPOCH ${report.epoch}] received a write request from user $user")
 
@@ -209,44 +221,67 @@ class Location : LocationGrpcKt.LocationCoroutineImplBase() {
         throw Status.INVALID_ARGUMENT.asException()
     }
 
-    override suspend fun getLocationReport(request: Report.UserLocationReportRequest): Report.UserLocationReportResponse {
-        val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
-        val locationRequest: LocationRequest = requestToLocationRequest(symKey, request.nonce, request.ciphertext)
-        val user = locationRequest.id
-        val epoch = locationRequest.epoch
-        val sig = locationRequest.signature
+    override fun getLocationReport(requests: Flow<Report.UserLocationReportRequest>): Flow<Report.UserLocationReportResponse> {
+        runBlocking {
+            var symKey: SecretKey
+            requests.collect { request ->
+                run {
+                    symKey = asymmetricDecipher(Database.key, request.key)
+                    val locationRequest: LocationRequest =
+                        requestToLocationRequest(symKey, request.nonce, request.ciphertext)
+                    val user = locationRequest.id
+                    val epoch = locationRequest.epoch
+                    val sig = locationRequest.signature
 
-        val decipheredNonce = Base64.getDecoder().decode(request.nonce)
-        val validNonce = try {
-            Database.nonceDAO.storeUserNonce(decipheredNonce, user)
-        } catch (e: DataAccessException) {
-            false
+                    val decipheredNonce = Base64.getDecoder().decode(request.nonce)
+                    val validNonce = try {
+                        Database.nonceDAO.storeUserNonce(decipheredNonce, user)
+                    } catch (e: DataAccessException) {
+                        false
+                    }
+
+                    if (!validNonce || !RequestValidationService.validateSignature(user, epoch, sig)) {
+                        throw Status.INVALID_ARGUMENT.asException()
+                    }
+
+                    println("[EPOCH $epoch] received a read request from user $user")
+                    val locationReport = LocationReportService.getLocationReport(user, epoch, F)
+                    // TODO: FIX THIS VVVV
+                    if (locationReport != null) {
+                        locationReport.signature = sign(
+                                Database.key,
+                                "${locationReport.id}${locationReport.epoch}${locationReport.coords}${locationReport.serverInfo}${locationReport.proofs.joinToString { "${it.prover}" }}"
+                            )
+
+                        Report.UserLocationReportResponse.newBuilder().apply {
+                            val messageNonce = generateNonce()
+                            nonce = Base64.getEncoder().encodeToString(messageNonce)
+
+                            ciphertext = symmetricCipher(
+                                symKey,
+                                Json.encodeToString(locationReport),
+                                messageNonce
+                            )
+                        }.build()
+                    } else {
+                        // TODO: Launch coroutine in global scope to wait
+                        Report.UserLocationReportResponse.newBuilder().apply {
+                            val messageNonce = generateNonce()
+                            nonce = Base64.getEncoder().encodeToString(messageNonce)
+
+                            ciphertext = symmetricCipher(
+                                symKey,
+                                Json.encodeToString(NO_REPORT),
+                                messageNonce
+                            )
+                        }.build()
+                    }
+                }
+            }
         }
 
-        if (!validNonce || !RequestValidationService.validateSignature(user, epoch, sig)) {
-            throw Status.INVALID_ARGUMENT.asException()
-        }
-
-        println("[EPOCH $epoch] received a read request from user $user")
-        val locationReport = LocationReportService.getLocationReport(user, epoch, F)
-        return if (locationReport != null) {
-            locationReport.signature = sign(
-                Database.key,
-                "${locationReport.id}${locationReport.epoch}${locationReport.coords}${locationReport.serverInfo}${locationReport.proofs.joinToString { "${it.prover}" }}"
-            )
-
-            Report.UserLocationReportResponse.newBuilder().apply {
-                val messageNonce = generateNonce()
-                nonce = Base64.getEncoder().encodeToString(messageNonce)
-
-                ciphertext = symmetricCipher(
-                    symKey,
-                    Json.encodeToString(locationReport),
-                    messageNonce
-                )
-            }.build()
-        } else {
-            throw Status.NOT_FOUND.asException()
+        return flow {
+            // TODO: implement
         }
     }
 }
@@ -344,6 +379,10 @@ fun requestToCoordinatesRequest(key: SecretKey, nonce: String, ciphertext: Strin
     return Json.decodeFromString(symmetricDecipher(key, Base64.getDecoder().decode(nonce), ciphertext))
 }
 
+fun decipherRequest(key: SecretKey, nonce: String, ciphertext: String): String {
+    val decodedNonce: ByteArray = Base64.getDecoder().decode(nonce)
+    return symmetricDecipher(key, decodedNonce, ciphertext)
+}
 
 fun deriveKey(password: String): String {
     val spec: KeySpec = PBEKeySpec(password.toCharArray(), PASS_SALT.toByteArray(), PBKDF2_ITER, PBKDF2_KEY_SIZE)

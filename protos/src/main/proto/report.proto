@@ -6,7 +6,7 @@ option java_package = "sec.hdlt.protos.server";
 
 service Location {
   rpc SubmitLocationReport (ReportRequest) returns (ReportResponse);
-  rpc GetLocationReport (UserLocationReportRequest) returns (UserLocationReportResponse);
+  rpc GetLocationReport (stream UserLocationReportRequest) returns (stream UserLocationReportResponse);
 }
 
 service HA {

@@ -3,11 +3,8 @@ package sec.hdlt.user
 import io.grpc.ServerBuilder
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.json.Json
 import sec.hdlt.user.domain.Database
 import sec.hdlt.user.dto.LocationRequest
-import sec.hdlt.user.dto.LocationResponse
 import sec.hdlt.user.services.MasterService
 import sec.hdlt.user.services.UserService
 import java.io.IOException
@@ -17,7 +14,6 @@ import java.security.PrivateKey
 import java.security.cert.CertificateException
 import java.security.spec.KeySpec
 import java.util.*
-import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 
@@ -34,10 +30,6 @@ const val PASS_SALT = "secret_salt"
 const val PASS_PREFIX = "user_pass_id_"
 const val PBKDF2_KEY_SIZE = 512
 const val PBKDF2_ITER = 100001
-
-// Communication relative params
-const val MIN_TIME_COM = 0L // seconds
-const val MAX_TIME_COM = 30L // seconds
 
 const val MAX_GRPC_TIME = 60L // seconds
 
@@ -129,7 +121,7 @@ fun main(args: Array<String>) {
 
             val epoch = request[0].toInt()
 
-            val reports = Database.frontend.getLocationReport(
+            val report = Database.frontend.getLocationReport(
                 LocationRequest(
                     // User Id
                     if (request.size == 2) {
@@ -146,7 +138,11 @@ fun main(args: Array<String>) {
                 )
             )
 
-            // TODO: check if all reports are equal and print to screen
+            if (report.isEmpty) {
+                println("NO REPORT FOR EPOCH $epoch")
+            } else {
+                println("GOT REPORT FOR EPOCH $epoch: $report")
+            }
         }
     }
 
