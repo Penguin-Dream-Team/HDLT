@@ -141,7 +141,7 @@ fun main(args: Array<String>) {
             if (report.isEmpty) {
                 println("NO REPORT FOR EPOCH $epoch")
             } else {
-                println("GOT REPORT FOR EPOCH $epoch: $report")
+                println("GOT REPORT FOR EPOCH $epoch: ${report.get()}")
             }
         }
     }

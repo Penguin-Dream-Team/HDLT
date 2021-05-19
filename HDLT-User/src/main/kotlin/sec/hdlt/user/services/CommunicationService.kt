@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -178,14 +179,20 @@ object CommunicationService {
 
                             val deciphered = decipherResponse(secret, response.nonce, response.ciphertext)
 
-                            // Check if report not found, invalid request or if end of communication
-                            if (deciphered == NO_REPORT) {
-                                println("[GetLocationReport] No report on the server")
-                            } else if (deciphered == INVALID_REQ) {
-                                println("[GetLocationReport] Invalid request")
-                            } else if (deciphered == END_COMM) {
-                                // Ignore
-                            } else {
+                            try {
+                                val message: String = Json.decodeFromString(deciphered)
+                                // Check if report not found, invalid request or if end of communication
+
+                                if (message == NO_REPORT) {
+                                    println("[GetLocationReport] No report on the server")
+                                } else if (message == INVALID_REQ) {
+                                    println("[GetLocationReport] Invalid request")
+                                } else if (message == END_COMM) {
+                                    // Ignore
+                                }
+                            } catch (e: SerializationException) {
+                                // Not a string, then it must be a report....
+
                                 val report: LocationResponse = Json.decodeFromString(deciphered)
                                 if (verifySignature(
                                         serverCert,
