@@ -17,12 +17,13 @@ import kotlin.system.exitProcess
  */
 const val ROW_COUNT = 10
 const val COL_COUNT = 10
-const val SERVER_COUNT = 2
-const val USER_COUNT = 10
+const val SERVER_COUNT = 4
+const val USER_COUNT = 5
 const val EPOCH_INTERVAL = 0.5
 const val F = 3
 const val F_LINE = 2
 const val BASE_SERVER_PORT = 7777
+const val BYZANTINE_SERVERS = 1
 
 fun main() {
     launch<MasterApplication>()
@@ -66,10 +67,11 @@ class MasterService(private val channel: ManagedChannel) : Closeable {
         return response.ok
     }
 
-    suspend fun sendInitSetup(numServers: Int, seed: Long) {
+    suspend fun sendInitSetup(numServers: Int, seed: Long, serverByzantine: Int) {
         val request = Master.InitRequest.newBuilder().apply {
             this.serverNum = numServers
             this.randomSeed = seed
+            this.serverByzantine = serverByzantine
         }
 
         stub.init(request.build())

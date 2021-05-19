@@ -5,7 +5,8 @@ import javafx.beans.binding.NumberExpressionBase
 import javafx.beans.property.SimpleIntegerProperty
 import javafx.scene.control.ButtonBar
 import javafx.util.Duration
-import kotlinx.coroutines.*
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import sec.hdlt.master.*
 import sec.hdlt.master.controllers.SimulatorController
 import sec.hdlt.master.viewmodels.MasterSetupViewModel
@@ -92,6 +93,17 @@ class MasterSetupView : View("MasterView | Setup") {
                     textfield(model.randomSeed) { longOnly() }.validator {
                         if (it.isNullOrBlank()) {
                             error("There needs to be a seed")
+                        } else {
+                            null
+                        }
+                    }
+                }
+                field("Byzantine Servers") {
+                    textfield(model.byzantineServers) { intOnly() }.validator {
+                        if (it.isNullOrBlank() || model.byzantineServers < 0) {
+                            error("Byzantine Servers cannot be negative")
+                        } else if (model.byzantineServers >= (model.serverCount - 1) / 2 && model.byzantineServers.value != 0) {
+                            error("Byzantine Servers has to be less than ${model.serverCount} - 1 / 2 (${(model.serverCount - 1) / 2}")
                         } else {
                             null
                         }

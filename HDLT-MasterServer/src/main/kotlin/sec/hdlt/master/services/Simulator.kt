@@ -15,13 +15,14 @@ class Simulator(
     private val epochInterval: Double,
     private val f: Int,
     private val fLine: Int,
+    private val serverByzantine: Int,
 ) {
     val grid: Grid = Grid(rows, cols, f, fLine)
     private val broadcaster: Broadcaster = Broadcaster(userCount)
     private var currentEpoch: Int = 0
 
     fun initAndLaunch() {
-        broadcaster.initUsers(serverCount)
+        broadcaster.initUsers(serverCount, serverByzantine)
         grid.initGrid(userCount)
         launch()
     }

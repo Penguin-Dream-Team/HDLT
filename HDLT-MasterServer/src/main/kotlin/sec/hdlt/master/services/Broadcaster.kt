@@ -18,13 +18,13 @@ class Broadcaster(userCount: Int) {
 
     private val logger = Logger.getLogger("Broadcaster")
 
-    fun initUsers(numServers: Int) {
+    fun initUsers(numServers: Int, serverByzantine: Int) {
         GlobalScope.launch {
             users.map { (i, service) ->
                 async {
                     try {
                         logger.info("Sending initialization parameters to user $i")
-                        service.sendInitSetup(numServers, HDLTRandom.seed)
+                        service.sendInitSetup(numServers, HDLTRandom.seed, serverByzantine)
                     } catch (e: Exception) {
                         logger.severe("Failed to send initialization parameters to user $i")
                     }

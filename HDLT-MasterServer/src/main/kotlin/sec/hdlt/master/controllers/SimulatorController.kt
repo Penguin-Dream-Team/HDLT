@@ -25,7 +25,8 @@ class SimulatorController : Controller() {
             model.userCount.value,
             model.epochInterval.value,
             model.f.value,
-            model.fLine.value
+            model.fLine.value,
+            model.byzantineServers.value
         ).apply {
             onStep = {
                 fire(GridUpdateRequest)

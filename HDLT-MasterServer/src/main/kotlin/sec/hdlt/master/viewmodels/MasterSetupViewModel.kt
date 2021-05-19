@@ -17,6 +17,7 @@ class MasterSetup {
     val fProperty = SimpleIntegerProperty(F)
     val fLineProperty = SimpleIntegerProperty(F_LINE)
     val randomSeedProperty = SimpleLongProperty(Random.nextLong())
+    val byzantineServersProperty = SimpleIntegerProperty(BYZANTINE_SERVERS)
 }
 
 class MasterSetupViewModel : ItemViewModel<MasterSetup>() {
@@ -28,6 +29,7 @@ class MasterSetupViewModel : ItemViewModel<MasterSetup>() {
     val f = bind(MasterSetup::fProperty)
     val fLine = bind(MasterSetup::fLineProperty)
     val randomSeed = bind(MasterSetup::randomSeedProperty)
+    val byzantineServers = bind(MasterSetup::byzantineServersProperty)
 }
 
 fun TextField.intOnly() {
