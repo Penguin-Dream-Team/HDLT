@@ -11,6 +11,8 @@ service Setup {
 message BroadcastValuesRequest {
   int32 f = 1;
   int32 fLine = 2;
+  int32 serverCount = 3;
+  int32 byzantineServers = 4;
 }
 
 message BroadcastValuesResponse {

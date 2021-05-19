@@ -158,6 +158,9 @@ class Setup : SetupGrpcKt.SetupCoroutineImplBase() {
     override suspend fun broadcastValues(request: Server.BroadcastValuesRequest): Server.BroadcastValuesResponse {
         F = request.f
         FLINE = request.fLine
+        val byzantineServers = request.byzantineServers
+        val serverCount = request.serverCount
+
         try {
             val file = File("server.settings")
             file.writeText("$F $FLINE")

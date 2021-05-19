@@ -134,7 +134,12 @@ class MasterSetupView : View("MasterView | Setup") {
                                         .forAddress("localhost", BASE_SERVER_PORT + it)
                                         .usePlaintext()
                                         .build()
-                                ).broadcastValues(model.f.value, model.fLine.value)
+                                ).broadcastValues(
+                                    model.f.value,
+                                    model.fLine.value,
+                                    model.serverCount.value,
+                                    model.byzantineServers.value
+                                )
                             } catch (e: Exception) {
                                 logger.severe("Failed to send initialization parameters to user $it")
                             }
