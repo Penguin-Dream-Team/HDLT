@@ -200,8 +200,7 @@ class CommunicationService {
                                                     curKey = k
                                                 }}
 
-                                            if (curMax > quorum
-                                            ) {
+                                            if (curMax > quorum) {
                                                 maxKey = curKey
                                                 // size + 1 due to non-flow wait
                                                 for (i in 0..servers.size) {

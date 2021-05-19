@@ -54,13 +54,14 @@ class LocationService : LocationGrpcKt.LocationCoroutineImplBase() {
                 println("[EPOCH ${report.epoch}] received a write request from user $user")
 
                 val ack: Boolean
-                // TODO: Broadcast
 
-                GET_REPORT_LISTENERS_LOCK.withLock {
-                    ack = LocationReportService.storeLocationReport(report, epoch, user, coordinates, proofs)
+                // Check if writer is byzantine with broadcast
+                if (broadcast(report)) {
+                    GET_REPORT_LISTENERS_LOCK.withLock {
+                        ack = LocationReportService.storeLocationReport(report, epoch, user, coordinates, proofs)
 
-                    // Check if valid report and if there are listeners
-                    if (ack && GET_REPORT_LISTENERS.containsKey(epoch)) {
+                        // Check if valid report and if there are listeners
+                        if (ack && GET_REPORT_LISTENERS.containsKey(epoch)) {
                             val epochListeners = GET_REPORT_LISTENERS[epoch]!!
                             if (epochListeners.containsKey(user)) {
                                 epochListeners[user]!!.stream().forEach {
@@ -70,18 +71,19 @@ class LocationService : LocationGrpcKt.LocationCoroutineImplBase() {
                                 epochListeners.remove(user)
                             }
                         }
+                    }
+
+                    return Report.ReportResponse.newBuilder().apply {
+                        val messageNonce = generateNonce()
+                        nonce = Base64.getEncoder().encodeToString(messageNonce)
+
+                        ciphertext = symmetricCipher(
+                            symKey,
+                            Json.encodeToString(ack),
+                            messageNonce
+                        )
+                    }.build()
                 }
-
-                return Report.ReportResponse.newBuilder().apply {
-                    val messageNonce = generateNonce()
-                    nonce = Base64.getEncoder().encodeToString(messageNonce)
-
-                    ciphertext = symmetricCipher(
-                        symKey,
-                        Json.encodeToString(ack),
-                        messageNonce
-                    )
-                }.build()
             }
         }
 
@@ -139,7 +141,7 @@ class LocationService : LocationGrpcKt.LocationCoroutineImplBase() {
                     var channel: Channel<Unit>? = null
                     var locationReport: LocationResponse?
                     GET_REPORT_LISTENERS_LOCK.withLock {
-                         locationReport = LocationReportService.getLocationReport(user, epoch, F)
+                        locationReport = LocationReportService.getLocationReport(user, epoch, F)
 
                         // Check if user has report
                         if (locationReport == null) {

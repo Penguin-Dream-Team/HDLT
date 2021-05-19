@@ -25,6 +25,7 @@ import sec.hdlt.server.dao.RequestsDAO
 import sec.hdlt.server.domain.*
 import sec.hdlt.server.services.LocationReportService
 import sec.hdlt.server.services.RequestValidationService
+import sec.hdlt.server.services.grpc.BroadcastService
 import sec.hdlt.server.services.grpc.HAService
 import sec.hdlt.server.services.grpc.LocationService
 import java.io.File
@@ -148,6 +149,7 @@ fun main(args: Array<String>) {
 
     val server = ServerBuilder.forPort(serverPort).apply {
         addService(Setup())
+        addService(BroadcastService())
         addService(LocationService())
         addService(HAService())
     }.build()
