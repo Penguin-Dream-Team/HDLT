@@ -23,7 +23,7 @@ fun proofOfWork(input: ProofOfWorkRequest): ProofOfWork? {
 
 fun createProofOfWorkRequest(data: String): ProofOfWorkRequest {
     return ProofOfWorkRequest(
-        data,
-        BigInteger.ONE.shiftLeft(256 - 20)
+        data = data,
+        workTarget = BigInteger.ONE.shiftLeft(256 - 24)
     )
 }

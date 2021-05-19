@@ -56,8 +56,6 @@ message UsersAtCoordinatesResponse {
 
 message ProofOfWork {
   string data = 1;
-  string workTarget = 2; // base64 of bigintegerbytes
-  int64 timestamp = 3;
-  string hash = 4;
-  int64 nonce = 5;
+  string hash = 2;
+  int64 nonce = 3;
 }
