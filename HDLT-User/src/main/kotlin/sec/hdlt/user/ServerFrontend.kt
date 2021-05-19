@@ -33,10 +33,10 @@ class ServerFrontend(host: String, port: Int, val num: Int, private val quorum: 
      * Submit a location report to the server
      */
     suspend fun submitReport(report: ReportDto): Boolean {
-        return CommunicationService().submitReport(report, servers, quorum)
+        return CommunicationService.submitReport(report, servers, quorum)
     }
 
     suspend fun getLocationReport(request: LocationRequest): Optional<LocationResponse> {
-        return CommunicationService().getLocationReport(request, servers, quorum)
+        return CommunicationService.getLocationReport(request, servers, quorum)
     }
 }

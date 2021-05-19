@@ -21,6 +21,7 @@ import sec.hdlt.user.domain.Server
 import sec.hdlt.user.dto.LocationRequest
 import sec.hdlt.user.dto.LocationResponse
 import sec.hdlt.user.dto.ReportDto
+import java.security.MessageDigest
 import java.security.SignatureException
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
@@ -32,7 +33,14 @@ const val END_COMM = "EndCommunication"
 
 val EMPTY_REPORT = LocationResponse(-1, -1, Coordinates(-1, -1), "", "", listOf())
 
-class CommunicationService {
+const val LEADING_ZEROS = 5
+
+object CommunicationService {
+
+    suspend fun proofOfWork(message: String) {
+
+    }
+
     suspend fun submitReport(report: ReportDto, servers: List<Server>, quorum: Int): Boolean {
         val channel = Channel<Unit>(Channel.CONFLATED)
         var okCount = 0

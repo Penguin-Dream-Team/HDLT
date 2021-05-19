@@ -1,6 +1,10 @@
 package sec.hdlt.user
 
-import java.security.*
+import java.nio.ByteBuffer
+import java.security.MessageDigest
+import java.security.PrivateKey
+import java.security.SecureRandom
+import java.security.Signature
 import java.security.cert.Certificate
 import java.util.*
 import javax.crypto.Cipher
@@ -45,7 +49,12 @@ fun asymmetricDecipher(key: PrivateKey, ciphertext: String): SecretKey {
     val cipher: Cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding")
     cipher.init(Cipher.DECRYPT_MODE, key)
 
-    return SecretKeySpec(Base64.getDecoder().decode(cipher.doFinal(Base64.getDecoder().decode(ciphertext))), 0, SYM_KEY_SIZE / 8, "ChaCha20")
+    return SecretKeySpec(
+        Base64.getDecoder().decode(cipher.doFinal(Base64.getDecoder().decode(ciphertext))),
+        0,
+        SYM_KEY_SIZE / 8,
+        "ChaCha20"
+    )
 }
 
 fun symmetricDecipher(key: SecretKey, nonce: ByteArray, ciphertext: String): String {
@@ -57,11 +66,11 @@ fun symmetricDecipher(key: SecretKey, nonce: ByteArray, ciphertext: String): Str
 }
 
 fun sign(key: PrivateKey, format: String): String {
-        val sig: Signature = Signature.getInstance("SHA256withRSA")
-        sig.initSign(key)
-        sig.update(format.toByteArray())
+    val sig: Signature = Signature.getInstance("SHA256withRSA")
+    sig.initSign(key)
+    sig.update(format.toByteArray())
 
-        return Base64.getEncoder().encodeToString(sig.sign())
+    return Base64.getEncoder().encodeToString(sig.sign())
 }
 
 fun verifySignature(key: Certificate, format: String, signature: String): Boolean {
@@ -70,4 +79,18 @@ fun verifySignature(key: Certificate, format: String, signature: String): Boolea
     sig.update(format.toByteArray())
 
     return sig.verify(Base64.getDecoder().decode(signature))
+}
+
+fun hash(input: MutableList<ByteArray>, nonce: Long): ByteArray {
+    // add nonce
+    input[input.size - 1] = ByteBuffer.allocate(8).putLong(nonce).array()
+
+    val digest = MessageDigest
+        .getInstance("SHA256")
+
+    input.forEach {
+        digest.update(it)
+    }
+
+    return digest.digest()
 }
