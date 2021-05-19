@@ -1,5 +1,7 @@
 package sec.hdlt.server
 
+import java.nio.ByteBuffer
+import java.security.MessageDigest
 import java.security.PrivateKey
 import java.security.SecureRandom
 import java.security.Signature
@@ -72,4 +74,18 @@ fun verifySignature(cert: Certificate, format: String, signature: String): Boole
     sig.update(format.toByteArray())
 
     return sig.verify(Base64.getDecoder().decode(signature))
+}
+
+fun hash(input: MutableList<ByteArray>, nonce: Long): ByteArray {
+    // add nonce
+    input[input.size - 1] = ByteBuffer.allocate(8).putLong(nonce).array()
+
+    val digest = MessageDigest
+        .getInstance("SHA256")
+
+    input.forEach {
+        digest.update(it)
+    }
+
+    return digest.digest()
 }

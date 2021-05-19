@@ -1,6 +1,6 @@
-package sec.hdlt.user.antispam
+package sec.hdlt.server.antispam
 
-import sec.hdlt.user.hash
+import sec.hdlt.server.hash
 import java.math.BigInteger
 import java.util.*
 
