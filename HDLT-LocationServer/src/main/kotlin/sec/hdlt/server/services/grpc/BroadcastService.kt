@@ -30,50 +30,60 @@ val EMPTY_REPORT = LocationReport(-1, -1, Coordinates(-1, -1), "", listOf())
 
 class BroadcastService : BroadcastGrpcKt.BroadcastCoroutineImplBase() {
     override suspend fun broadcast(request: Server.BroadcastRequest): Server.BroadcastResponse {
-        val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
-        val report: LocationReport = requestToLocationReport(symKey, request.nonce, request.ciphertext)
+        try {
+            val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
+            val report: LocationReport = requestToLocationReport(symKey, request.nonce, request.ciphertext)
 
-        BROADCAST_LOCK.withLock {
-            val epochResponses: ConcurrentHashMap<Int, MutableList<LocationReport>> =
-                if (BROADCAST_RESPONSES.containsKey(report.epoch)) {
-                    BROADCAST_RESPONSES[report.epoch]!!
-                } else {
-                    ConcurrentHashMap<Int, MutableList<LocationReport>>()
-                }
-
-            val responses: MutableList<LocationReport>
-            if (epochResponses.containsKey(report.epoch)) {
-                responses = epochResponses[report.id]!!
-                responses.add(report)
-            } else {
-                responses = mutableListOf(report)
-            }
-
-            // Group responses
-            var curMax = -1
-            val remaining = Database.numServers - responses.size
-            responses.stream()
-                .collect(Collectors.groupingByConcurrent { s -> s })
-                .forEach { (_, v) ->
-                    if (v.size > curMax) {
-                        curMax = v.size
+            BROADCAST_LOCK.withLock {
+                val epochResponses: ConcurrentHashMap<Int, MutableList<LocationReport>> =
+                    if (BROADCAST_RESPONSES.containsKey(report.epoch)) {
+                        BROADCAST_RESPONSES[report.epoch]!!
+                    } else {
+                        val map = ConcurrentHashMap<Int, MutableList<LocationReport>>()
+                        BROADCAST_RESPONSES[report.epoch] = map
+                        map
                     }
+
+                val responses: MutableList<LocationReport>
+                if (epochResponses.containsKey(report.id)) {
+                    responses = epochResponses[report.id]!!
+                    responses.add(report)
+                } else {
+                    responses = mutableListOf(report)
+                    epochResponses[report.id] = responses
                 }
 
-            val epochListener: ConcurrentHashMap<Int, Channel<Boolean>>
-            if (BROADCAST_CHANNELS.containsKey(report.epoch)) {
-                epochListener = BROADCAST_CHANNELS[report.epoch]!!
+                // Group responses
+                var curMax = -1
+                val remaining = Database.numServers - responses.size
+                responses.stream()
+                    .collect(Collectors.groupingByConcurrent { s -> s })
+                    .forEach { (_, v) ->
+                        if (v.size > curMax) {
+                            curMax = v.size
+                        }
+                    }
 
-                if (epochListener.containsKey(report.id)) {
-                    val channel: Channel<Boolean> = epochListener[report.id]!!
+                val epochListener: ConcurrentHashMap<Int, Channel<Boolean>>
+                if (BROADCAST_CHANNELS.containsKey(report.epoch)) {
+                    epochListener = BROADCAST_CHANNELS[report.epoch]!!
+
+                    if (epochListener.containsKey(report.id)) {
+                        val channel: Channel<Boolean> = epochListener[report.id]!!
                         if (curMax > Database.quorum) {
                             channel.offer(true)
                         } else if (remaining + curMax < Database.quorum) {
                             // Check if quorum is unreachable
                             channel.offer(false)
                         }
+                    }
                 }
             }
+
+        } catch (e: Exception) {
+            // TODO: DEBUG
+            println("BROADCAST ERROR")
+            e.printStackTrace()
         }
 
         return Server.BroadcastResponse.getDefaultInstance()
@@ -109,31 +119,70 @@ suspend fun broadcast(request: LocationReport): Boolean {
 
     val channel = Channel<Boolean>(Channel.CONFLATED)
 
+    var res: Boolean? = null
     BROADCAST_LOCK.withLock {
         val epochListener: ConcurrentHashMap<Int, Channel<Boolean>> =
             if (BROADCAST_CHANNELS.containsKey(request.epoch)) {
                 BROADCAST_CHANNELS[request.epoch]!!
             } else {
-                ConcurrentHashMap<Int, Channel<Boolean>>()
+                val map = ConcurrentHashMap<Int, Channel<Boolean>>()
+                BROADCAST_CHANNELS[request.epoch] = map
+                map
             }
 
         epochListener[request.id] = channel
+
+        val epochResponses: ConcurrentHashMap<Int, MutableList<LocationReport>> =
+            if (BROADCAST_RESPONSES.containsKey(request.epoch)) {
+                BROADCAST_RESPONSES[request.epoch]!!
+            } else {
+                val map = ConcurrentHashMap<Int, MutableList<LocationReport>>()
+                BROADCAST_RESPONSES[request.epoch] = map
+                map
+            }
+
+        val responses: MutableList<LocationReport> = if (epochResponses.containsKey(request.id)) {
+            epochResponses[request.id]!!
+        } else {
+            val list = mutableListOf<LocationReport>()
+            epochResponses[request.id] = list
+            list
+        }
+
+        // Group responses
+        var curMax = -1
+        val remaining = Database.numServers - responses.size
+        responses.stream()
+            .collect(Collectors.groupingByConcurrent { s -> s })
+            .forEach { (_, v) ->
+                if (v.size > curMax) {
+                    curMax = v.size
+                }
+            }
+
+        if (curMax > Database.quorum) {
+            res = true
+        } else if (remaining + curMax < Database.quorum) {
+            // Check if quorum is unreachable
+            res = false
+        }
     }
 
-    // Activate timeout to obtain quorum
-    val job = GlobalScope.launch {
-        delay(BROADCAST_DELAY)
-        channel.offer(false)
+    if (res == null) {
+        // Activate timeout to obtain quorum
+        val job = GlobalScope.launch {
+            delay(BROADCAST_DELAY)
+            channel.offer(false)
+        }
+
+        // Wait for response
+        res = channel.receive()
+
+        // Cancel timeout if not triggered
+        if (job.isActive) {
+            job.cancel()
+        }
     }
 
-
-    // Wait for response
-    val response = channel.receive()
-
-    // Cancel timeout if not triggered
-    if (job.isActive) {
-        job.cancel()
-    }
-
-    return response
+    return res!!
 }

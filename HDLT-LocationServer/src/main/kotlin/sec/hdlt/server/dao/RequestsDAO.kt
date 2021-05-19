@@ -20,13 +20,5 @@ class RequestsDAO(
                 .execute()
         }
     }
-
-    fun getUserRequests(userId: Int, create: DSLContext = dslContext): Int {
-        val timeStamp = LocalDateTime.now()
-        return create.fetchCount(USER_REQUESTS
-            .where(USER_REQUESTS.USER_ID.eq(userId))
-            .where(USER_REQUESTS.TIMESTAMP.lessOrEqual(timeStamp.plusSeconds(1)))
-        )
-    }
 }
 

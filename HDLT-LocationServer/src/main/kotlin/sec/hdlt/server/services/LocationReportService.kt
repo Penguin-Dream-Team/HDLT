@@ -89,9 +89,6 @@ class LocationReportService {
 
         private fun handleRequests(userId: Int) {
             Database.requestsDAO.saveUserRequest(userId)
-            if (Database.requestsDAO.getUserRequests(userId) > REQUESTS_LIMIT) {
-                throw SpamException(userId)
-            }
         }
     }
 }
