@@ -30,6 +30,7 @@ import javax.crypto.SecretKey
 
 const val NO_REPORT = "NoReport"
 const val END_COMM = "EndCommunication"
+const val INVALID_REQ = "InvalidRequest"
 
 val EMPTY_REPORT = LocationResponse(-1, -1, Coordinates(-1, -1), "", "", listOf())
 
@@ -176,9 +177,12 @@ object CommunicationService {
                             }
 
                             val deciphered = decipherResponse(secret, response.nonce, response.ciphertext)
-                            // Check if report not found or if end of communication
+
+                            // Check if report not found, invalid request or if end of communication
                             if (deciphered == NO_REPORT) {
                                 println("[GetLocationReport] No report on the server")
+                            } else if (deciphered == INVALID_REQ) {
+                                println("[GetLocationReport] Invalid request")
                             } else if (deciphered == END_COMM) {
                                 // Ignore
                             } else {
@@ -204,8 +208,7 @@ object CommunicationService {
                                                     curKey = k
                                                 }}
 
-                                            if (curMax > quorum
-                                            ) {
+                                            if (curMax > quorum) {
                                                 maxKey = curKey
                                                 // size + 1 due to non-flow wait
                                                 for (i in 0..servers.size) {

@@ -37,7 +37,7 @@ object Database {
      * @param byzantine the number of byzantine servers in the system
      */
     fun initServer(host: String, port: Int, num: Int, byzantine: Int) {
-        frontend = ServerFrontend(host, port, num, (num + 2 * byzantine)/2)
+        frontend = ServerFrontend(host, port, num, (num + byzantine)/2)
     }
 
     /**

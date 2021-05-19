@@ -22,7 +22,6 @@ data class LocationResponse (val id: Int, val epoch: Int, val coords: Coordinate
         if (epoch != other.epoch) return false
         if (coords != other.coords) return false
         if (serverInfo != other.serverInfo) return false
-        if (signature != other.signature) return false
         if (proofs != other.proofs) return false
 
         return true

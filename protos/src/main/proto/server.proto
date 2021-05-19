@@ -18,3 +18,18 @@ message BroadcastValuesRequest {
 message BroadcastValuesResponse {
   bool ok = 1;
 }
+
+service Broadcast {
+    rpc Broadcast(BroadcastRequest) returns (BroadcastResponse);
+}
+
+message BroadcastRequest {
+  // All fields are base64-encoded
+  string key = 1; // Ciphered with server's public key
+  string nonce = 2;
+  string ciphertext = 3;
+}
+
+message BroadcastResponse {
+
+}
