@@ -1,10 +1,7 @@
 package sec.hdlt.master.services
 
 import io.grpc.ManagedChannelBuilder
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import sec.hdlt.master.MasterService
 import sec.hdlt.master.data.Grid
 import sec.hdlt.utils.HDLTRandom
@@ -30,6 +27,24 @@ class Broadcaster(userCount: Int) {
                     }
                 }
             }.awaitAll()
+        }
+    }
+
+    fun initHA(numServers: Int, serverByzantine: Int) {
+        GlobalScope.launch {
+            withContext(Dispatchers.Default) {
+                try {
+                    logger.info("Sending initialization parameters to ha")
+                    MasterService(
+                        ManagedChannelBuilder
+                            .forAddress("localhost", 9000)
+                            .usePlaintext()
+                            .build()
+                    ).sendInitSetup(numServers, HDLTRandom.seed, serverByzantine)
+                } catch (e: Exception) {
+                    logger.severe("Failed to send initialization parameters to ha")
+                }
+            }
         }
     }
 

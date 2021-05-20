@@ -23,6 +23,7 @@ class Simulator(
 
     fun initAndLaunch() {
         broadcaster.initUsers(serverCount, serverByzantine)
+        broadcaster.initHA(serverCount, serverByzantine)
         grid.initGrid(userCount)
         launch()
     }
