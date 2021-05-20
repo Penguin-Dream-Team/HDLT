@@ -199,6 +199,10 @@ fun requestToCoordinatesRequest(key: SecretKey, nonce: String, ciphertext: Strin
     return Json.decodeFromString(symmetricDecipher(key, Base64.getDecoder().decode(nonce), ciphertext))
 }
 
+fun requestToWitnessRequest(key: SecretKey, nonce: String, ciphertext: String): WitnessRequest {
+    return Json.decodeFromString(symmetricDecipher(key, Base64.getDecoder().decode(nonce), ciphertext))
+}
+
 fun decipherRequest(key: SecretKey, nonce: String, ciphertext: String): String {
     val decodedNonce: ByteArray = Base64.getDecoder().decode(nonce)
     return symmetricDecipher(key, decodedNonce, ciphertext)

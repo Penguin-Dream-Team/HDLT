@@ -19,10 +19,7 @@ import sec.hdlt.user.*
 import sec.hdlt.user.domain.Coordinates
 import sec.hdlt.user.domain.Database
 import sec.hdlt.user.domain.Server
-import sec.hdlt.user.dto.LocationRequest
-import sec.hdlt.user.dto.LocationResponse
-import sec.hdlt.user.dto.ReportDto
-import java.security.MessageDigest
+import sec.hdlt.user.dto.*
 import java.security.SignatureException
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
@@ -245,6 +242,40 @@ object CommunicationService {
         channel.receive()
 
         return if (maxKey == EMPTY_REPORT) Optional.empty() else Optional.of(maxKey)
+    }
+
+    suspend fun getWitnessProofs(
+        request: WitnessRequest,
+        servers: MutableList<Server>,
+        quorum: Int
+    ) : Optional<WitnessResponse> {
+        val channel = Channel<Unit>(Channel.UNLIMITED)
+        val responses = ConcurrentHashMap<Int, Optional<LocationResponse>>()
+        var maxKey: LocationResponse = EMPTY_REPORT
+
+        val mutex = Mutex()
+
+        for (server: Server in servers) {
+            GlobalScope.launch {
+                val serverStub = LocationGrpcKt.LocationCoroutineStub(server.channel)
+
+                val secret = generateKey()
+                val serverCert = Database.getServerKey(server.id)
+
+                try {
+                    // TODO READ REGULAR
+
+                } catch (e: SignatureException) {
+                    println("Could not sign message")
+                    return@launch
+                } catch (e: StatusException) {
+                    println("[GetWitnessProofs] Error connecting to server")
+                    return@launch
+                }
+            }
+        }
+
+        channel.receive()
     }
 }
 

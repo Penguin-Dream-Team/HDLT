@@ -5,6 +5,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import sec.hdlt.user.domain.Database
 import sec.hdlt.user.dto.LocationRequest
+import sec.hdlt.user.dto.WitnessRequest
 import sec.hdlt.user.services.MasterService
 import sec.hdlt.user.services.UserService
 import java.io.IOException
@@ -105,43 +106,102 @@ fun main(args: Array<String>) {
     // Allow server queries
     GlobalScope.launch {
         while (true) {
-            println("Write request in the form `<epoch> [<user to get>]`")
-            val request: List<String>
+            println("Write 1 to request a report or write 2 to request your proofs as witness")
+            val type: List<String>
 
             try {
-                request = readLine()!!.split(" ")
+                type = readLine()!!.split(" ")
             } catch (e: NumberFormatException) {
                 continue
             }
 
-            if (request.size > 2 || request.isEmpty()) {
+            if (type.size > 1 || type.isEmpty()) {
                 println("Invalid syntax")
                 continue
             }
 
-            val epoch = request[0].toInt()
+            if (type[0].toInt() == 0) {
+                println("Write request in the form `<epoch> [<user to get>]`")
+                val request: List<String>
 
-            val report = Database.frontend.getLocationReport(
-                LocationRequest(
-                    // User Id
-                    if (request.size == 2) {
-                        request[1].toInt()
-                    } else {
-                        id
-                    },
+                try {
+                    request = readLine()!!.split(" ")
+                } catch (e: NumberFormatException) {
+                    continue
+                }
 
-                    // Epoch
-                    epoch,
+                if (request.size > 2 || request.isEmpty()) {
+                    println("Invalid syntax")
+                    continue
+                }
 
-                    // Signature
-                    sign(privKey, "${id}${epoch}")
+                val epoch = request[0].toInt()
+
+                val report = Database.frontend.getLocationReport(
+                    LocationRequest(
+                        // User Id
+                        if (request.size == 2) {
+                            request[1].toInt()
+                        } else {
+                            id
+                        },
+
+                        // Epoch
+                        epoch,
+
+                        // Signature
+                        sign(privKey, "${id}${epoch}")
+                    )
                 )
-            )
 
-            if (report.isEmpty) {
-                println("NO REPORT FOR EPOCH $epoch")
-            } else {
-                println("GOT REPORT FOR EPOCH $epoch: ${report.get()}")
+                if (report.isEmpty) {
+                    println("NO REPORT FOR EPOCH $epoch")
+                } else {
+                    println("GOT REPORT FOR EPOCH $epoch: ${report.get()}")
+                }
+            }
+            else if (type[0].toInt() == 1) {
+                println("Write request in the form `<epoch>+`")
+                val request: List<String>
+
+                try {
+                    request = readLine()!!.split(" ")
+                } catch (e: NumberFormatException) {
+                    continue
+                }
+
+                if (request.isEmpty()) {
+                    println("Invalid syntax")
+                    continue
+                }
+
+                val epochs = request.map { it.toInt() }
+
+                val proofs = Database.frontend.getWitnessProofs(
+                    WitnessRequest(
+                        // User Id
+                        if (request.size == 2) {
+                            request[1].toInt()
+                        } else {
+                            id
+                        },
+
+                        // Epochs
+                        epochs,
+
+                        // Signature
+                        sign(privKey, "${id}${epochs}")
+                    )
+                )
+
+                if (proofs.isEmpty) {
+                    println("NO PROOFS AS WITNESS FOUND FOR YOUR EPOCHS")
+                } else {
+                    println("GOT PROOFS AS WITNESS:\n$proofs")
+                }
+            }
+            else {
+                println("Unknown command")
             }
         }
     }

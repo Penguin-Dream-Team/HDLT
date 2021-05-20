@@ -84,6 +84,14 @@ class RequestValidationService {
             return validateSignatureImpl(prover, sig, "${user}${prover}${epoch}", user)
         }
 
+        fun validateSignature(
+            user: Int,
+            epochs: List<Int>,
+            sig: String
+        ): Boolean {
+            return validateSignatureImpl(user, sig, "${user}${epochs}", user)
+        }
+
         fun getValidProofs(
             user: Int,
             epoch: Int,

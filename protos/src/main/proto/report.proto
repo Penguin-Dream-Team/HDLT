@@ -7,6 +7,7 @@ option java_package = "sec.hdlt.protos.server";
 service Location {
   rpc SubmitLocationReport (ReportRequest) returns (ReportResponse);
   rpc GetLocationReport (stream UserLocationReportRequest) returns (stream UserLocationReportResponse);
+  rpc GetWitnessProofs (WitnessProofsRequest) returns (WitnessProofsResponse);
 }
 
 service HA {
@@ -50,6 +51,17 @@ message UsersAtCoordinatesRequest {
 
 message UsersAtCoordinatesResponse {
   // All fields are base64-encoded
+  string nonce = 1;
+  string ciphertext = 2;
+}
+
+message WitnessProofsRequest {
+  string key = 1; // Ciphered with server's public key
+  string nonce = 2;
+  string ciphertext = 3;
+}
+
+message WitnessProofsResponse {
   string nonce = 1;
   string ciphertext = 2;
 }

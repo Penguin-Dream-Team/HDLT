@@ -2,9 +2,7 @@ package sec.hdlt.user
 
 import io.grpc.ManagedChannelBuilder
 import sec.hdlt.user.domain.Server
-import sec.hdlt.user.dto.LocationRequest
-import sec.hdlt.user.dto.LocationResponse
-import sec.hdlt.user.dto.ReportDto
+import sec.hdlt.user.dto.*
 import sec.hdlt.user.services.CommunicationService
 import java.util.*
 
@@ -36,7 +34,17 @@ class ServerFrontend(host: String, port: Int, val num: Int, private val quorum: 
         return CommunicationService.submitReport(report, servers, quorum)
     }
 
+    /**
+     * Request a location report from the server
+     */
     suspend fun getLocationReport(request: LocationRequest): Optional<LocationResponse> {
         return CommunicationService.getLocationReport(request, servers, quorum)
+    }
+
+    /**
+     * Request all witness proofs from the server
+     */
+    suspend fun getWitnessProofs(request: WitnessRequest): Optional<WitnessResponse> {
+        return CommunicationService.getWitnessProofs(request, servers, quorum)
     }
 }
