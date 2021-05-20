@@ -5,10 +5,7 @@ import org.jooq.DSLContext
 import org.jooq.impl.DSL
 import sec.hdlt.server.db.database.Tables.PROOFS
 import sec.hdlt.server.db.database.Tables.REPORTS
-import sec.hdlt.server.domain.Coordinates
-import sec.hdlt.server.domain.LocationReport
-import sec.hdlt.server.domain.Proof
-import sec.hdlt.server.domain.ReportInfo
+import sec.hdlt.server.domain.*
 import sec.hdlt.server.exceptions.ProofCreationException
 import sec.hdlt.server.exceptions.ReportCreationException
 import sec.hdlt.server.exceptions.UserReportNotFoundException
@@ -58,14 +55,24 @@ class ReportDAO(
         ) != 0
     }
 
-    fun getUsersAtLocation(epoch: Int, coords: Coordinates, create: DSLContext = dslContext): List<Int> {
-        return create.select(REPORTS.USER_ID)
+    fun getUsersAtLocation(epoch: Int, coords: Coordinates, create: DSLContext = dslContext): List<LocationReport> {
+        return create.select()
             .from(REPORTS)
             .where(REPORTS.EPOCH.eq(epoch))
             .and(REPORTS.X.eq(coords.x))
             .and(REPORTS.Y.eq(coords.y))
             .fetch().map {
-                it[REPORTS.USER_ID].toInt()
+                getUserLocationReport(
+                    it[REPORTS.ID], ReportInfo(
+                        id = it[REPORTS.USER_ID].toInt(),
+                        epoch = it[REPORTS.EPOCH].toInt(),
+                        coordinates = Coordinates(
+                            x = it[REPORTS.X].toInt(),
+                            y = it[REPORTS.Y].toInt()
+                        ),
+                        serverInfo = ""
+                    )
+                )
             }.toList()
     }
 

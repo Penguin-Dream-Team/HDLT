@@ -30,60 +30,53 @@ val EMPTY_REPORT = LocationReport(-1, -1, Coordinates(-1, -1), "", listOf())
 
 class BroadcastService : BroadcastGrpcKt.BroadcastCoroutineImplBase() {
     override suspend fun broadcast(request: Server.BroadcastRequest): Server.BroadcastResponse {
-        try {
-            val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
-            val report: LocationReport = requestToLocationReport(symKey, request.nonce, request.ciphertext)
+        val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
+        val report: LocationReport = requestToLocationReport(symKey, request.nonce, request.ciphertext)
 
-            BROADCAST_LOCK.withLock {
-                val epochResponses: ConcurrentHashMap<Int, MutableList<LocationReport>> =
-                    if (BROADCAST_RESPONSES.containsKey(report.epoch)) {
-                        BROADCAST_RESPONSES[report.epoch]!!
-                    } else {
-                        val map = ConcurrentHashMap<Int, MutableList<LocationReport>>()
-                        BROADCAST_RESPONSES[report.epoch] = map
-                        map
-                    }
-
-                val responses: MutableList<LocationReport>
-                if (epochResponses.containsKey(report.id)) {
-                    responses = epochResponses[report.id]!!
-                    responses.add(report)
+        BROADCAST_LOCK.withLock {
+            val epochResponses: ConcurrentHashMap<Int, MutableList<LocationReport>> =
+                if (BROADCAST_RESPONSES.containsKey(report.epoch)) {
+                    BROADCAST_RESPONSES[report.epoch]!!
                 } else {
-                    responses = mutableListOf(report)
-                    epochResponses[report.id] = responses
+                    val map = ConcurrentHashMap<Int, MutableList<LocationReport>>()
+                    BROADCAST_RESPONSES[report.epoch] = map
+                    map
                 }
 
-                // Group responses
-                var curMax = -1
-                val remaining = Database.numServers - responses.size
-                responses.stream()
-                    .collect(Collectors.groupingByConcurrent { s -> s })
-                    .forEach { (_, v) ->
-                        if (v.size > curMax) {
-                            curMax = v.size
-                        }
+            val responses: MutableList<LocationReport>
+            if (epochResponses.containsKey(report.id)) {
+                responses = epochResponses[report.id]!!
+                responses.add(report)
+            } else {
+                responses = mutableListOf(report)
+                epochResponses[report.id] = responses
+            }
+
+            // Group responses
+            var curMax = -1
+            val remaining = Database.numServers - responses.size
+            responses.stream()
+                .collect(Collectors.groupingByConcurrent { s -> s })
+                .forEach { (_, v) ->
+                    if (v.size > curMax) {
+                        curMax = v.size
                     }
+                }
 
-                val epochListener: ConcurrentHashMap<Int, Channel<Boolean>>
-                if (BROADCAST_CHANNELS.containsKey(report.epoch)) {
-                    epochListener = BROADCAST_CHANNELS[report.epoch]!!
+            val epochListener: ConcurrentHashMap<Int, Channel<Boolean>>
+            if (BROADCAST_CHANNELS.containsKey(report.epoch)) {
+                epochListener = BROADCAST_CHANNELS[report.epoch]!!
 
-                    if (epochListener.containsKey(report.id)) {
-                        val channel: Channel<Boolean> = epochListener[report.id]!!
-                        if (curMax > Database.quorum) {
-                            channel.offer(true)
-                        } else if (remaining + curMax < Database.quorum) {
-                            // Check if quorum is unreachable
-                            channel.offer(false)
-                        }
+                if (epochListener.containsKey(report.id)) {
+                    val channel: Channel<Boolean> = epochListener[report.id]!!
+                    if (curMax > Database.quorum) {
+                        channel.offer(true)
+                    } else if (remaining + curMax < Database.quorum) {
+                        // Check if quorum is unreachable
+                        channel.offer(false)
                     }
                 }
             }
-
-        } catch (e: Exception) {
-            // TODO: DEBUG
-            println("BROADCAST ERROR")
-            e.printStackTrace()
         }
 
         return Server.BroadcastResponse.getDefaultInstance()

@@ -61,7 +61,7 @@ class LocationReportService {
             return Database.reportDAO.hasUserReport(userId, epoch)
         }
 
-        fun getUsersAtLocation(epoch: Int, coords: Coordinates): List<Int> {
+        fun getUsersAtLocation(epoch: Int, coords: Coordinates): List<LocationReport> {
             return Database.reportDAO.getUsersAtLocation(epoch, coords)
         }
 

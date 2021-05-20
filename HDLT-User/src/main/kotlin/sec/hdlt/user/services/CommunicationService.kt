@@ -276,6 +276,9 @@ object CommunicationService {
         }
 
         channel.receive()
+
+        // TODO: FIXME
+        return Optional.empty()
     }
 }
 

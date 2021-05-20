@@ -2,11 +2,16 @@ package sec.hdlt.ha
 
 import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
+import io.grpc.ServerBuilder
 import io.grpc.StatusException
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import sec.hdlt.ha.data.*
+import sec.hdlt.protos.master.HDLTMasterGrpcKt
+import sec.hdlt.protos.master.Master
 import sec.hdlt.protos.server.HAGrpcKt
 import sec.hdlt.protos.server.Report
 import java.io.IOException
@@ -14,6 +19,7 @@ import java.io.InputStream
 import java.lang.NumberFormatException
 import java.security.KeyStore
 import java.security.PrivateKey
+import java.security.SignatureException
 import java.security.cert.Certificate
 import java.security.cert.CertificateException
 import java.util.*
@@ -23,9 +29,14 @@ const val KEYSTORE_FILE = "/ha.jks"
 const val KEYSTORE_PASS = "KeyStoreHA"
 const val KEY_PASS = "123"
 const val KEY_ALIAS_HA = "hdlt_ha"
-const val KEY_ALIAS_SERVER = "hdlt_server"
+const val CERT_SERVER_PREFIX = "cert_hdlt_server_"
+const val CERT_USER_PREFIX = "cert_hdlt_user_"
+const val BASE_PORT = 9000
 
-suspend fun main(args: Array<String>) {
+var locationHost: String = ""
+var locationPort: Int = -1
+
+fun main(args: Array<String>) {
     println("*****************************")
     println("* Health Authorities Client *")
     println("*****************************")
@@ -35,10 +46,9 @@ suspend fun main(args: Array<String>) {
         return
     }
 
-    val serverHost = args[0]
-    val serverPort: Int
+    locationHost = args[0]
     try {
-        serverPort = args[1].toInt()
+        locationPort = args[1].toInt()
     } catch (e: NumberFormatException) {
         println("Invalid port number")
         return
@@ -62,154 +72,112 @@ suspend fun main(args: Array<String>) {
     // Get private key
     val privKey: PrivateKey = keyStore.getKey(KEY_ALIAS_HA, KEY_PASS.toCharArray()) as PrivateKey
 
-    // Get server certificate
-    val serverCert: Certificate = keyStore.getCertificate(KEY_ALIAS_SERVER)
+    Database.key = privKey
 
-    // Initialize connection to server
-    val channel: ManagedChannel = ManagedChannelBuilder.forAddress(serverHost, serverPort).usePlaintext().build()
-    val stub = HAGrpcKt.HACoroutineStub(channel)
 
-    while (true) {
-        println("1 - Request report of a user")
-        println("2 - Request for one users at specific location")
-        println("3 - Exit")
-        print(">> ")
-        val option: Int
-
-        try {
-            option = readLine()!!.toInt()
-        } catch (e: NumberFormatException) {
-            println("Invalid option")
-            continue
-        }
-
-        // Ask for report of one user
-        if (option == 1) {
-            println("Asking for report of a user")
-            println("Insert <user id> <epoch>")
+    GlobalScope.launch {
+        while (true) {
+            println("1 - Request report of a user")
+            println("2 - Request for one users at specific location")
+            println("3 - Exit")
             print(">> ")
-            val options: List<String> = readLine()!!.split(" ")
+            val option: Int
 
-            if (options.size != 2) {
-                println("Usage: <user id> <epoch>")
-                continue
-            }
-
-            val user: Int
-            val epoch: Int
             try {
-                user = options[0].toInt()
-                epoch = options[1].toInt()
+                option = readLine()!!.toInt()
             } catch (e: NumberFormatException) {
-                println("User id and Epoch need to be numbers")
+                println("Invalid option")
                 continue
             }
 
-            try {
-                val secret = generateKey()
-                val response = stub.userLocationReport(Report.UserLocationReportRequest.newBuilder().apply {
-                    val messageNonce = generateNonce()
-                    key = asymmetricCipher(serverCert.publicKey, Base64.getEncoder().encodeToString(secret.encoded))
-                    nonce = Base64.getEncoder().encodeToString(messageNonce)
-                    ciphertext = symmetricCipher(secret, Json.encodeToString(ReportRequest(
-                        user,
-                        epoch,
-                        sign(privKey, "${user}${epoch}")
-                    )), messageNonce)
-                }.build())
+            // Ask for report of one user
+            if (option == 1) {
+                println("Asking for report of a user")
+                println("Insert <user id> <epoch>")
+                print(">> ")
+                val options: List<String> = readLine()!!.split(" ")
 
-                if (response.nonce.equals("") || response.ciphertext.equals("")) {
-                    println("No location found for epoch $epoch for user $user")
+                if (options.size != 2) {
+                    println("Usage: <user id> <epoch>")
                     continue
                 }
 
-                val report: ReportResponse = responseToReport(secret, response.nonce, response.ciphertext)
-                if (verifySignature(serverCert, "$user$epoch${report.coords}${report.serverInfo}${report.proofs.joinToString { "${it.prover}" }}", report.signature)) {
-                    println("User $user was at ${report.coords} in epoch $epoch")
-                    println("Server Info: ${report.serverInfo}")
-                } else {
-                    println("Response was not sent by server")
-                }
-            } catch (e: StatusException) {
-                println("Server error, try again")
-                continue
-            }
-
-        // Ask for users at given location and epoch
-        } else if (option == 2) {
-            println("Asking for users at given location and epoch")
-            println("Insert <epoch> <coordinate x> <coordinate y>")
-            print(">> ")
-            val options: List<String> = readLine()!!.split(" ")
-
-            if (options.size != 3) {
-                println("Usage: <epoch> <coordinate x> <coordinate y>")
-                continue
-            }
-
-            val epoch: Int
-            val coords: Coordinates
-            try {
-                epoch = options[0].toInt()
-                coords = Coordinates(options[1].toInt(), options[2].toInt())
-            } catch (e: NumberFormatException) {
-                println("Epoch and both Coordinates need to be numbers")
-                continue
-            }
-
-            try {
-                val secret = generateKey()
-                val response = stub.usersAtCoordinates(Report.UsersAtCoordinatesRequest.newBuilder().apply {
-                    val messageNonce = generateNonce()
-                    key = asymmetricCipher(serverCert.publicKey, Base64.getEncoder().encodeToString(secret.encoded))
-                    nonce = Base64.getEncoder().encodeToString(messageNonce)
-                    ciphertext = symmetricCipher(secret, Json.encodeToString(
-                        EpochLocationRequest(
-                        coords,
-                        epoch,
-                        sign(privKey, "${coords}${epoch}")
-                    )
-                    ), messageNonce)
-                }.build())
-
-                if (response.nonce.equals("") || response.ciphertext.equals("")) {
-                    println("No users found at coords $coords in epoch $epoch")
+                val user: Int
+                val epoch: Int
+                try {
+                    user = options[0].toInt()
+                    epoch = options[1].toInt()
+                } catch (e: NumberFormatException) {
+                    println("User id and Epoch need to be numbers")
                     continue
                 }
 
-                val location: EpochLocationResponse = responseToLocation(secret, response.nonce, response.ciphertext)
-                if (verifySignature(serverCert, "$coords$epoch${location.users.joinToString { "$it" }}", location.signature)) {
-                    if(location.users.isEmpty()) {
-                        println("No users found at coords $coords in epoch $epoch")
-                    } else {
-                        println("Users found at ${location.coords} in epoch $epoch:")
-                        for (user in location.users) {
-                            println(user)
-                        }
-                    }
-                } else {
-                    println("Response was not sent by server")
+                val report: Optional<ReportResponse>
+                try {
+                    report = Database.frontend.getLocationReport(ReportRequest(user, epoch, sign(Database.key, "$user$epoch")))
+                } catch (e: SignatureException) {
+                    println("Couldn't sign message")
+                    continue
                 }
-            } catch (e: StatusException) {
-                println("Server error, try again")
-                continue
+
+                if (report.isEmpty) {
+                    println("NO REPORT FOR USER $user EPOCH $epoch")
+                } else {
+                    println("GOT REPORT FOR USER $user EPOCH $epoch: ${report.get()}")
+                }
+
+                // Ask for users at given location and epoch
+            } else if (option == 2) {
+                println("Asking for users at given location and epoch")
+                println("Insert <epoch> <coordinate x> <coordinate y>")
+                print(">> ")
+                val options: List<String> = readLine()!!.split(" ")
+
+                if (options.size != 3) {
+                    println("Usage: <epoch> <coordinate x> <coordinate y>")
+                    continue
+                }
+
+                val epoch: Int
+                val coords: Coordinates
+                try {
+                    epoch = options[0].toInt()
+                    coords = Coordinates(options[1].toInt(), options[2].toInt())
+                } catch (e: NumberFormatException) {
+                    println("Epoch and both Coordinates need to be numbers")
+                    continue
+                }
+
+                val users = Database.frontend.usersAtLocation(EpochLocationRequest(coords, epoch, sign(Database.key, "$coords$epoch")))
+
+                println(if (users.isEmpty) "No users at $coords in epoch $epoch" else "Users found: ${users.get()}")
+            } else if (option == 3) {
+                break
+            } else {
+                println("Unknown option")
             }
-        } else if (option == 3) {
-            break
-        } else {
-            println("Unknown option")
         }
+
+        val server = ServerBuilder.forPort(BASE_PORT)
+            .addService(Setup())
+            .build()
+
+        server.start()
+        server.awaitTermination()
     }
-}
-
-fun responseToReport(key: SecretKey, nonce: String, ciphertext: String): ReportResponse {
-    val decodedNonce: ByteArray = Base64.getDecoder().decode(nonce)
-    val deciphered = symmetricDecipher(key, decodedNonce, ciphertext)
-    return Json.decodeFromString(deciphered)
 }
 
 fun responseToLocation(key: SecretKey, nonce: String, ciphertext: String): EpochLocationResponse {
     val decodedNonce: ByteArray = Base64.getDecoder().decode(nonce)
     val deciphered = symmetricDecipher(key, decodedNonce, ciphertext)
     return Json.decodeFromString(deciphered)
+}
+
+class Setup: HDLTMasterGrpcKt.HDLTMasterCoroutineImplBase() {
+    override suspend fun init(request: Master.InitRequest): Master.InitResponse {
+        // Initialize connection to server
+        Database.initServer(locationHost, locationPort, request.serverNum, request.serverByzantine)
+
+        return Master.InitResponse.getDefaultInstance()
+    }
 }

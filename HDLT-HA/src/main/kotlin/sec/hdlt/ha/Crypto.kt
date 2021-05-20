@@ -26,7 +26,7 @@ fun generateNonce(): ByteArray {
     return nonce
 }
 
-fun asymmetricCipher(key: PublicKey, plaintext: String): String {
+fun asymmetricCipher(key: Certificate, plaintext: String): String {
     val cipher: Cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding")
     cipher.init(Cipher.ENCRYPT_MODE, key)
 
