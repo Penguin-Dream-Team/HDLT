@@ -1,13 +1,14 @@
 package sec.hdlt.server.dao
 
-import org.jooq.*
+import org.jooq.Configuration
+import org.jooq.DSLContext
 import org.jooq.impl.DSL
+import sec.hdlt.server.db.database.Tables.PROOFS
+import sec.hdlt.server.db.database.Tables.REPORTS
 import sec.hdlt.server.domain.Coordinates
 import sec.hdlt.server.domain.LocationReport
 import sec.hdlt.server.domain.Proof
 import sec.hdlt.server.domain.ReportInfo
-import sec.hdlt.server.db.database.Tables.PROOFS
-import sec.hdlt.server.db.database.Tables.REPORTS
 import sec.hdlt.server.exceptions.ProofCreationException
 import sec.hdlt.server.exceptions.ReportCreationException
 import sec.hdlt.server.exceptions.UserReportNotFoundException
@@ -23,6 +24,29 @@ class ReportDAO(
                 .from(REPORTS)
                 .where(REPORTS.EPOCH.eq(epoch))
         ) != 0
+    }
+
+    fun getWitnessProofs(userId: Int, epochs: List<Int>, create: DSLContext = dslContext): List<Proof> {
+        return create.select()
+            .from(REPORTS)
+            .where(REPORTS.EPOCH.`in`(epochs))
+            .fetch().flatMap {
+                val reportId = it[REPORTS.ID]
+                val requester = it[REPORTS.USER_ID].toInt()
+                val epoch = it[REPORTS.EPOCH].toInt()
+                create.select()
+                    .from(PROOFS)
+                    .where(PROOFS.REPORT_ID.eq(reportId))
+                    .and(PROOFS.OTHER_USER_ID.eq(userId))
+                    .fetch().map { proofIt ->
+                        Proof(
+                            requester = requester,
+                            prover = userId,
+                            epoch = epoch,
+                            signature = proofIt[PROOFS.SIGNATURE]
+                        )
+                    }
+            }
     }
 
     fun hasUserReport(userId: Int, epoch: Int, create: DSLContext = dslContext): Boolean {

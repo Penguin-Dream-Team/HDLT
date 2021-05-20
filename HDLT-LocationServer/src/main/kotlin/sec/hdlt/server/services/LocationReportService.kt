@@ -4,7 +4,6 @@ import org.slf4j.LoggerFactory
 import sec.hdlt.server.domain.*
 import sec.hdlt.server.exceptions.DuplicateReportException
 import sec.hdlt.server.exceptions.HDLTException
-import sec.hdlt.server.exceptions.SpamException
 
 class LocationReportService {
     companion object {
@@ -29,6 +28,17 @@ class LocationReportService {
             } catch (ex: HDLTException) {
                 logger.error(ex.message)
                 false
+            }
+        }
+
+        suspend fun getWitnessProofs(userId: Int, epochs: List<Int>): List<Proof> {
+            handleRequests(userId)
+
+            return try {
+                Database.reportDAO.getWitnessProofs(userId, epochs)
+            } catch (ex: HDLTException) {
+                logger.error(ex.message)
+                emptyList()
             }
         }
 
