@@ -15,8 +15,14 @@ import sec.hdlt.server.services.RequestValidationService
 import java.util.*
 import javax.crypto.SecretKey
 
-class HAService : HAGrpcKt.HACoroutineImplBase() {
+class HAService(val byzantineLevel: Int) : HAGrpcKt.HACoroutineImplBase() {
     override suspend fun userLocationReport(request: Report.UserLocationReportRequest): Report.UserLocationReportResponse {
+        // Byzantine Level 1: Ignore request
+        if (byzantineLevel >= 1 && Database.random.nextInt(100) < BYZ_PROB_NOT_SEND) {
+            println("Dropping request")
+            return Report.UserLocationReportResponse.getDefaultInstance()
+        }
+
         val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
         val locationRequest: LocationRequest = requestToLocationRequest(symKey, request.nonce, request.ciphertext)
         val user = locationRequest.id
@@ -58,6 +64,12 @@ class HAService : HAGrpcKt.HACoroutineImplBase() {
     }
 
     override suspend fun usersAtCoordinates(request: Report.UsersAtCoordinatesRequest): Report.UsersAtCoordinatesResponse {
+        // Byzantine Level 1: Ignore request
+        if (byzantineLevel >= 1 && Database.random.nextInt(100) < BYZ_PROB_NOT_SEND) {
+            println("Dropping request")
+            return Report.UsersAtCoordinatesResponse.getDefaultInstance()
+        }
+
         val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
         val usersRequest: CoordinatesRequest = requestToCoordinatesRequest(symKey, request.nonce, request.ciphertext)
         val epoch = usersRequest.epoch

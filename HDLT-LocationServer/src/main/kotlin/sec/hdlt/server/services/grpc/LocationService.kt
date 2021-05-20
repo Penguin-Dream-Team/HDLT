@@ -19,12 +19,21 @@ import sec.hdlt.server.domain.LocationRequest
 import sec.hdlt.server.domain.LocationResponse
 import sec.hdlt.server.services.LocationReportService
 import sec.hdlt.server.services.RequestValidationService
+import java.lang.invoke.MethodHandles
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import javax.crypto.SecretKey
 
-class LocationService : LocationGrpcKt.LocationCoroutineImplBase() {
+class LocationService(val byzantineLevel: Int) : LocationGrpcKt.LocationCoroutineImplBase() {
     override suspend fun submitLocationReport(request: Report.ReportRequest): Report.ReportResponse {
+
+        // Byzantine Level 1: Ignore request
+        if (byzantineLevel >= 1 && Database.random.nextInt(100) < BYZ_PROB_NOT_SEND) {
+            println("Dropping request")
+            return Report.ReportResponse.getDefaultInstance()
+        }
+
+
         try {
             val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
             val report: LocationReport = requestToLocationReport(symKey, request.nonce, request.ciphertext)
@@ -98,6 +107,12 @@ class LocationService : LocationGrpcKt.LocationCoroutineImplBase() {
 
     override fun getLocationReport(requests: Flow<Report.UserLocationReportRequest>): Flow<Report.UserLocationReportResponse> {
         var symKey: SecretKey
+
+        // Byzantine Level 1: Ignore request
+        if (byzantineLevel >= 1 && Database.random.nextInt(100) < BYZ_PROB_NOT_SEND) {
+            println("Dropping request")
+            return flow { requests.collect() }
+        }
 
         return flow {
             requests.collect { request ->

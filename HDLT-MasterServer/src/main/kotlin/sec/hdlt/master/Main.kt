@@ -34,12 +34,13 @@ class SetupService(private val channel: ManagedChannel) : Closeable {
     private val logger = LoggerFactory.getLogger("SetupService")
     private val stub = SetupGrpcKt.SetupCoroutineStub(channel)
 
-    suspend fun broadcastValues(f: Int, fLine: Int, serverCount: Int, byzantineServers: Int) {
+    suspend fun broadcastValues(f: Int, fLine: Int, serverCount: Int, byzantineServers: Int, randomSeed: Long) {
         val request = Server.BroadcastValuesRequest.newBuilder().apply {
             this.f = f
             this.fLine = fLine
             this.serverCount = serverCount
             this.byzantineServers = byzantineServers
+            this.randomSeed = randomSeed
         }
 
         val response = stub.broadcastValues(request.build())

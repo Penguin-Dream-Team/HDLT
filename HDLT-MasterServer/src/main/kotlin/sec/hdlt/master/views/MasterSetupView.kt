@@ -138,7 +138,8 @@ class MasterSetupView : View("MasterView | Setup") {
                                     model.f.value,
                                     model.fLine.value,
                                     model.serverCount.value,
-                                    model.byzantineServers.value
+                                    model.byzantineServers.value,
+                                    model.randomSeed.value
                                 )
                             } catch (e: Exception) {
                                 logger.severe("Failed to send initialization parameters to user $it")

@@ -3,19 +3,11 @@ package sec.hdlt.server
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import io.grpc.ServerBuilder
-import io.grpc.Status
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.jooq.SQLDialect
-import org.jooq.exception.DataAccessException
 import org.jooq.impl.DefaultConfiguration
 import sec.hdlt.protos.server.*
 import sec.hdlt.server.dao.AbstractDAO
@@ -23,8 +15,6 @@ import sec.hdlt.server.dao.NonceDAO
 import sec.hdlt.server.dao.ReportDAO
 import sec.hdlt.server.dao.RequestsDAO
 import sec.hdlt.server.domain.*
-import sec.hdlt.server.services.LocationReportService
-import sec.hdlt.server.services.RequestValidationService
 import sec.hdlt.server.services.grpc.BroadcastService
 import sec.hdlt.server.services.grpc.HAService
 import sec.hdlt.server.services.grpc.LocationService
@@ -67,6 +57,11 @@ const val INVALID_REQ = "InvalidRequest"
 
 val GET_REPORT_LISTENERS = ConcurrentHashMap<Int, ConcurrentHashMap<Int, MutableList<Channel<Unit>>>>()
 val GET_REPORT_LISTENERS_LOCK = Mutex()
+
+// Byzantine options
+const val MIN_BYZ_LEV = -1 // Not byzantine
+const val MAX_BYZ_LEV = 1 // Hardest byzantine
+const val BYZ_PROB_NOT_SEND = 40 // Probability of not responding
 
 var F = 0
 var FLINE = 0
@@ -150,8 +145,8 @@ fun main(args: Array<String>) {
     val server = ServerBuilder.forPort(serverPort).apply {
         addService(Setup())
         addService(BroadcastService())
-        addService(LocationService())
-        addService(HAService())
+        addService(LocationService(byzantineLevel))
+        addService(HAService(byzantineLevel))
     }.build()
 
     server.start()
@@ -176,6 +171,7 @@ class Setup : SetupGrpcKt.SetupCoroutineImplBase() {
         FLINE = request.fLine
         Database.numServers = request.serverCount
         Database.quorum = (request.serverCount - 2 * request.byzantineServers) / 2
+        Database.initRandom(request.randomSeed)
 
         try {
             val file = File("server.settings")
