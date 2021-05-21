@@ -282,7 +282,7 @@ object CommunicationService {
                     if (verifySignature(
                             serverCert,
                             "$locationInfo.coordinates$locationInfo.epoch${locationInfo.users.joinToString { "$it" }}",
-                            request.signature
+                            locationInfo.signature
                         )
                     ) {
                         if (locationInfo.coords == request.coords && locationInfo.epoch == request.epoch) {
