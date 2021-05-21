@@ -105,8 +105,6 @@ class BroadcastService : BroadcastGrpcKt.BroadcastCoroutineImplBase() {
                         }
                     }
 
-                println("RESPONSES: $responses")
-
                 val epochListener: ConcurrentHashMap<Int, Channel<Optional<LocationReport>>>
                 if (BROADCAST_CHANNELS.containsKey(report.epoch)) {
                     epochListener = BROADCAST_CHANNELS[report.epoch]!!

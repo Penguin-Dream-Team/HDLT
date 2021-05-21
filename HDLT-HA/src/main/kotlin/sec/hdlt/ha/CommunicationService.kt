@@ -79,7 +79,7 @@ object CommunicationService {
                             if (response.nonce.equals("") || response.ciphertext.equals("")) {
                                 println("[GetLocationReport] Empty response from server")
                                 mutex.withLock {
-                                    responses[server.id] = Optional.empty()
+                                    responses[server.id] = Optional.of(EMPTY_REPORT)
 
                                     // Group responses
                                     var curMax = -1
@@ -116,7 +116,7 @@ object CommunicationService {
                                 if (message == NO_REPORT) {
                                     println("[GetLocationReport] No report on the server")
                                     mutex.withLock {
-                                        responses[server.id] = Optional.empty()
+                                        responses[server.id] = Optional.of(EMPTY_REPORT)
 
                                         // Group responses
                                         var curMax = -1
@@ -145,7 +145,7 @@ object CommunicationService {
                                 } else if (message == INVALID_REQ) {
                                     println("[GetLocationReport] Invalid request")
                                     mutex.withLock {
-                                        responses[server.id] = Optional.empty()
+                                        responses[server.id] = Optional.of(EMPTY_REPORT)
 
                                         // Group responses
                                         var curMax = -1
