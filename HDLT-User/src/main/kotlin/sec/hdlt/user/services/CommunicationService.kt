@@ -16,6 +16,8 @@ import kotlinx.serialization.json.Json
 import sec.hdlt.protos.server.LocationGrpcKt
 import sec.hdlt.protos.server.Report
 import sec.hdlt.user.*
+import sec.hdlt.user.antispam.createProofOfWorkRequest
+import sec.hdlt.user.antispam.proofOfWork
 import sec.hdlt.user.domain.Coordinates
 import sec.hdlt.user.domain.Database
 import sec.hdlt.user.domain.Server
@@ -36,8 +38,9 @@ const val LEADING_ZEROS = 5
 
 object CommunicationService {
 
-    suspend fun proofOfWork(message: String) {
-
+    private fun prepareProofOfWork(message: String): Report.ProofOfWork {
+        val request = createProofOfWorkRequest(message)
+        return proofOfWork(request)?.toGrpcProof() ?: Report.ProofOfWork.getDefaultInstance()
     }
 
     suspend fun submitReport(report: ReportDto, servers: List<Server>, quorum: Int): Boolean {
@@ -287,15 +290,16 @@ object CommunicationService {
                                             var curMax = -1
                                             var curKey: LocationResponse = EMPTY_REPORT
                                             responses.values.stream()
-                                                .collect(Collectors.groupingByConcurrent { s ->                                                         (s.orElse(
-                                                    EMPTY_REPORT
-                                                )).toString()
+                                                .collect(Collectors.groupingByConcurrent { s ->
+                                                    (s.orElse(
+                                                        EMPTY_REPORT
+                                                    )).toString()
                                                 })
-                                                .forEach { (_,v) ->
+                                                .forEach { (_, v) ->
                                                     if (v.size > curMax) {
                                                         curMax = v.size
-                                                    curKey = v[0].get()
-                                                }
+                                                        curKey = v[0].get()
+                                                    }
                                                 }
 
                                             if (curMax > quorum) {
@@ -334,7 +338,7 @@ object CommunicationService {
         request: WitnessRequest,
         servers: MutableList<Server>,
         quorum: Int
-    ) : Optional<WitnessResponse> {
+    ): Optional<WitnessResponse> {
         val channel = Channel<Unit>(Channel.UNLIMITED)
         val responses = ConcurrentHashMap<Int, Optional<LocationResponse>>()
         var maxKey: LocationResponse = EMPTY_REPORT
@@ -350,6 +354,17 @@ object CommunicationService {
 
                 try {
                     // TODO READ REGULAR
+                    val messageNonce = generateNonce()
+
+                    val grpcRequest = Report.WitnessProofsRequest.newBuilder().apply {
+                        key = asymmetricCipher(serverCert, Base64.getEncoder().encodeToString(secret.encoded))
+                        nonce = Base64.getEncoder().encodeToString(messageNonce)
+                        ciphertext = symmetricCipher(secret, Json.encodeToString(request), messageNonce)
+                        proofOfWork = prepareProofOfWork(nonce)
+                    }.build()
+
+                    serverStub.getWitnessProofs(grpcRequest)
+
 
                 } catch (e: SignatureException) {
                     println("Could not sign message")

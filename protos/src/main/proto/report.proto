@@ -59,6 +59,7 @@ message WitnessProofsRequest {
   string key = 1; // Ciphered with server's public key
   string nonce = 2;
   string ciphertext = 3;
+  ProofOfWork proofOfWork = 4;
 }
 
 message WitnessProofsResponse {
