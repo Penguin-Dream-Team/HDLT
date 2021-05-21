@@ -11,6 +11,6 @@ data class Report(
     val proofs: List<Proof>
 ) {
     override fun toString(): String {
-        return "ID: $id EPOCH: $epoch COORDS: $location PROOFS: $proofs"
+        return "ID: $id EPOCH: $epoch COORDS: $location PROOFS: ${proofs.joinToString { " ${it.prover} " }}"
     }
 }
