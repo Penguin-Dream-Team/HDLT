@@ -428,14 +428,14 @@ fun responseToWitnessResponse(key: SecretKey, nonce: String, ciphertext: String)
 fun verifyEpochLocationReport(epoch: Int, coords: Coordinates, report: sec.hdlt.ha.data.Report): Boolean {
     return report.epoch == epoch &&
             report.location == coords &&
-            report.proofs.isNotEmpty() /*&&
+            report.proofs.isNotEmpty() &&
             report.proofs.stream()
-                .anyMatch { verifyProof(report.id, it) }*/
+                .anyMatch { verifyProof(report.id, it) }
 }
 
 fun verifyProof(user: Int, proof: Proof): Boolean {
     return try {
-        val cert: Certificate = Database.keyStore.getCertificate(CERT_USER_PREFIX + user)
+        val cert: Certificate = Database.keyStore.getCertificate(CERT_USER_PREFIX + proof.prover)
         verifySignature(cert, "$user${proof.prover}${proof.epoch}", proof.signature)
     } catch (e: SignatureException) {
         false
