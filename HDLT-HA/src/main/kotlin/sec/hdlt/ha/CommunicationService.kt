@@ -285,6 +285,7 @@ object CommunicationService {
                             locationInfo.signature
                         )
                     ) {
+
                         if (locationInfo.coords == request.coords && locationInfo.epoch == request.epoch) {
                             val valid = locationInfo.users.stream().filter {
                                 verifyEpochLocationReport(request.epoch, request.coords, it)
@@ -427,9 +428,9 @@ fun responseToWitnessResponse(key: SecretKey, nonce: String, ciphertext: String)
 fun verifyEpochLocationReport(epoch: Int, coords: Coordinates, report: sec.hdlt.ha.data.Report): Boolean {
     return report.epoch == epoch &&
             report.location == coords &&
-            report.proofs.isNotEmpty() &&
+            report.proofs.isNotEmpty() /*&&
             report.proofs.stream()
-                .anyMatch { verifyProof(report.id, it) }
+                .anyMatch { verifyProof(report.id, it) }*/
 }
 
 fun verifyProof(user: Int, proof: Proof): Boolean {

@@ -151,7 +151,7 @@ fun main(args: Array<String>) {
 
                 val users = Database.frontend.usersAtLocation(EpochLocationRequest(coords, epoch, sign(Database.key, "$coords$epoch")))
 
-                println(if (users.isEmpty) "No users at $coords in epoch $epoch" else "Users found: ${users.get()}")
+                println(if (users.isEmpty) "No users at $coords in epoch $epoch" else "Users found: ${users.get().users}")
 
                 // Ask for user witness proofs
             } else if (option == 3) {
