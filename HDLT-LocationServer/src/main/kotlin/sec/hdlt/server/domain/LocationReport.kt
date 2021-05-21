@@ -10,6 +10,10 @@ data class LocationReport(
     val signature: String,
     val proofs: List<Proof>
 ) {
+    override fun toString(): String {
+        return "ID: $id EPOCH: $epoch COORDS: $location PROOFS: ${proofs.joinToString { " ${it.prover} " }}"
+    }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false

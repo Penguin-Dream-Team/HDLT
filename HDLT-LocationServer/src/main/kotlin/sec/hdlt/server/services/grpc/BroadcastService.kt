@@ -97,13 +97,15 @@ class BroadcastService : BroadcastGrpcKt.BroadcastCoroutineImplBase() {
                 var curKey = EMPTY_REPORT
                 val remaining = Database.numServers - responses.size
                 responses.stream()
-                    .collect(Collectors.groupingByConcurrent { s -> s.response })
-                    .forEach { (k, v) ->
+                    .collect(Collectors.groupingByConcurrent { s -> s.response.toString() })
+                    .forEach { (_, v) ->
                         if (v.size > curMax) {
                             curMax = v.size
-                            curKey = k
+                            curKey = v[0].response
                         }
                     }
+
+                println("RESPONSES: $responses")
 
                 val epochListener: ConcurrentHashMap<Int, Channel<Optional<LocationReport>>>
                 if (BROADCAST_CHANNELS.containsKey(report.epoch)) {
@@ -195,11 +197,11 @@ suspend fun broadcast(request: LocationReport): Optional<LocationReport> {
             var curKey = EMPTY_REPORT
             val remaining = Database.numServers - responses.size
             responses.stream()
-                .collect(Collectors.groupingBy { s -> s })
-                .forEach { (k, v) ->
+                .collect(Collectors.groupingBy { s -> s.toString() })
+                .forEach { (_, v) ->
                     if (v.size > curMax) {
                         curMax = v.size
-                        curKey = k.response
+                        curKey = v[0].response
                     }
                 }
 
@@ -232,6 +234,10 @@ suspend fun broadcast(request: LocationReport): Optional<LocationReport> {
 }
 
 data class BroadcastInfo(val id: Int, val response: LocationReport) {
+    override fun toString(): String {
+        return response.toString()
+    }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
