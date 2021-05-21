@@ -223,7 +223,7 @@ class LocationService(val byzantineLevel: Int) : LocationGrpcKt.LocationCoroutin
 
         if (!verifyProofOfWork(request.proofOfWork.toProofOfWork())) {
             println("[Anti-Spam] Work submitted not valid")
-            throw Status.INVALID_ARGUMENT.asException()
+            return Report.WitnessProofsResponse.getDefaultInstance()
         }
 
         val decipheredNonce = Base64.getDecoder().decode(request.nonce)
@@ -231,7 +231,7 @@ class LocationService(val byzantineLevel: Int) : LocationGrpcKt.LocationCoroutin
             Database.nonceDAO.storeUserNonce(decipheredNonce, user)
         } catch (e: DataAccessException) {
             println("[WitnessProofs] Received invalid nonce")
-            throw Status.INVALID_ARGUMENT.asException()
+            return Report.WitnessProofsResponse.getDefaultInstance()
         }
 
         val validNonce = try {
