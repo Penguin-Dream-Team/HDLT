@@ -106,7 +106,7 @@ fun main(args: Array<String>) {
     // Allow server queries
     GlobalScope.launch {
         while (true) {
-            println("Write 1 to request a report or write 2 to request your proofs as witness")
+            println("Write 0 to request a report or write 1 to request your proofs as witness")
             val type: List<String>
 
             try {

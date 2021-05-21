@@ -71,14 +71,14 @@ class HAService(private val byzantineLevel: Int) : HAGrpcKt.HACoroutineImplBase(
 
                     println("[HA Request] received a report request for $user in epoch $epoch")
 
-                    var channel: Channel<Unit>?
+                    var channel: Channel<Unit>? = null
                     var locationReport: LocationResponse?
 
                     GET_REPORT_LISTENERS_LOCK.withLock {
                         locationReport = LocationReportService.getLocationReport(user, epoch, FLINE)
 
                         // Check if user has report
-                        if (locationReport != null) {
+                        if (locationReport == null) {
                             // Send message stating report doesn't exist
                             emit(Report.UserLocationReportResponse.newBuilder().apply {
                                 val messageNonce = generateNonce()
@@ -86,7 +86,6 @@ class HAService(private val byzantineLevel: Int) : HAGrpcKt.HACoroutineImplBase(
 
                                 ciphertext = symmetricCipher(symKey, Json.encodeToString(NO_REPORT), messageNonce)
                             }.build())
-                        }
 
                         channel = Channel(Channel.CONFLATED)
 
@@ -104,14 +103,16 @@ class HAService(private val byzantineLevel: Int) : HAGrpcKt.HACoroutineImplBase(
                         } else {
                             epochListeners[user] = mutableListOf(channel!!)
                         }
+                        }
                     }
 
                     if (channel != null) {
                         // Wait for write to wake up
                         channel!!.receive()
+
+                        locationReport = LocationReportService.getLocationReport(user, epoch, F)
                     }
 
-                    locationReport = LocationReportService.getLocationReport(user, epoch, F)
 
                     // Sign report
                     locationReport!!.signature = sign(

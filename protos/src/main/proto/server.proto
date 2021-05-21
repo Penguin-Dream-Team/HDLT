@@ -25,10 +25,12 @@ service Broadcast {
 }
 
 message BroadcastRequest {
-  // All fields are base64-encoded
+  // All string fields are base64-encoded
   string key = 1; // Ciphered with server's public key
   string nonce = 2;
   string ciphertext = 3;
+  string signature = 4;
+  int32 server_id = 5;
 }
 
 message BroadcastResponse {

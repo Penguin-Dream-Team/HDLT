@@ -28,7 +28,7 @@ class LocationService(val byzantineLevel: Int) : LocationGrpcKt.LocationCoroutin
             return Report.ReportResponse.getDefaultInstance()
         }
         val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
-        val report: LocationReport = requestToLocationReport(symKey, request.nonce, request.ciphertext)
+        var report: LocationReport = requestToLocationReport(symKey, request.nonce, request.ciphertext)
 
         val user = report.id
         val epoch = report.epoch
@@ -40,6 +40,7 @@ class LocationService(val byzantineLevel: Int) : LocationGrpcKt.LocationCoroutin
         val validNonce = try {
             Database.nonceDAO.storeUserNonce(decipheredNonce, user)
         } catch (e: DataAccessException) {
+            e.printStackTrace()
             false
         }
 
@@ -58,7 +59,9 @@ class LocationService(val byzantineLevel: Int) : LocationGrpcKt.LocationCoroutin
                 val ack: Boolean
 
                 // Check if writer is byzantine with broadcast
-                if (broadcast(report)) {
+                val broadcastValue = broadcast(report)
+                if (broadcastValue.isPresent) {
+                    report = broadcastValue.get()
                     GET_REPORT_LISTENERS_LOCK.withLock {
                         ack = LocationReportService.storeLocationReport(report, epoch, user, coordinates, proofs)
 

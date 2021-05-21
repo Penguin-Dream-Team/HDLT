@@ -78,6 +78,33 @@ object CommunicationService {
                         run {
                             if (response.nonce.equals("") || response.ciphertext.equals("")) {
                                 println("[GetLocationReport] Empty response from server")
+                                mutex.withLock {
+                                    responses[server.id] = Optional.empty()
+
+                                    // Group responses
+                                    var curMax = -1
+                                    var curKey: ReportResponse = EMPTY_REPORT
+                                    responses.values.stream()
+                                        .collect(Collectors.groupingByConcurrent { s ->
+                                            (s.orElse(
+                                                EMPTY_REPORT
+                                            )).toString()
+                                        })
+                                        .forEach { (_, v) ->
+                                            if (v.size > curMax) {
+                                                curMax = v.size
+                                                curKey = v[0].get()
+                                            }
+                                        }
+
+                                    if (curMax > quorum) {
+                                        maxKey = curKey
+                                        // size + 1 due to non-flow wait
+                                        for (i in 0..servers.size) {
+                                            channel.offer(Unit)
+                                        }
+                                    }
+                                }
                             }
 
                             val deciphered = decipherResponse(secret, response.nonce, response.ciphertext)
@@ -88,8 +115,62 @@ object CommunicationService {
 
                                 if (message == NO_REPORT) {
                                     println("[GetLocationReport] No report on the server")
+                                    mutex.withLock {
+                                        responses[server.id] = Optional.empty()
+
+                                        // Group responses
+                                        var curMax = -1
+                                        var curKey: ReportResponse = EMPTY_REPORT
+                                        responses.values.stream()
+                                            .collect(Collectors.groupingByConcurrent { s ->
+                                                (s.orElse(
+                                                    EMPTY_REPORT
+                                                )).toString()
+                                            })
+                                            .forEach { (_, v) ->
+                                                if (v.size > curMax) {
+                                                    curMax = v.size
+                                                    curKey = v[0].get()
+                                                }
+                                            }
+
+                                        if (curMax > quorum) {
+                                            maxKey = curKey
+                                            // size + 1 due to non-flow wait
+                                            for (i in 0..servers.size) {
+                                                channel.offer(Unit)
+                                            }
+                                        }
+                                    }
                                 } else if (message == INVALID_REQ) {
                                     println("[GetLocationReport] Invalid request")
+                                    mutex.withLock {
+                                        responses[server.id] = Optional.empty()
+
+                                        // Group responses
+                                        var curMax = -1
+                                        var curKey: ReportResponse = EMPTY_REPORT
+                                        responses.values.stream()
+                                            .collect(Collectors.groupingByConcurrent { s ->
+                                                (s.orElse(
+                                                    EMPTY_REPORT
+                                                )).toString()
+                                            })
+                                            .forEach { (_, v) ->
+                                                if (v.size > curMax) {
+                                                    curMax = v.size
+                                                    curKey = v[0].get()
+                                                }
+                                            }
+
+                                        if (curMax > quorum) {
+                                            maxKey = curKey
+                                            // size + 1 due to non-flow wait
+                                            for (i in 0..servers.size) {
+                                                channel.offer(Unit)
+                                            }
+                                        }
+                                    }
                                 } else if (message == END_COMM) {
                                     // Ignore
                                 }
@@ -114,14 +195,14 @@ object CommunicationService {
                                                 var curKey: ReportResponse = EMPTY_REPORT
                                                 responses.values.stream()
                                                     .collect(Collectors.groupingByConcurrent { s ->
-                                                        s.orElse(
+                                                        (s.orElse(
                                                             EMPTY_REPORT
-                                                        )
+                                                        )).toString()
                                                     })
-                                                    .forEach { (k, v) ->
+                                                    .forEach { (_, v) ->
                                                         if (v.size > curMax) {
                                                             curMax = v.size
-                                                            curKey = k
+                                                            curKey = v[0].get()
                                                         }
                                                     }
 

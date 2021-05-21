@@ -73,7 +73,7 @@ fun main(args: Array<String>) {
     val privKey: PrivateKey = keyStore.getKey(KEY_ALIAS_HA, KEY_PASS.toCharArray()) as PrivateKey
 
     Database.key = privKey
-
+    Database.keyStore = keyStore
 
     GlobalScope.launch {
         while (true) {
@@ -157,14 +157,14 @@ fun main(args: Array<String>) {
                 println("Unknown option")
             }
         }
-
-        val server = ServerBuilder.forPort(BASE_PORT)
-            .addService(Setup())
-            .build()
-
-        server.start()
-        server.awaitTermination()
     }
+
+    val server = ServerBuilder.forPort(BASE_PORT)
+        .addService(Setup())
+        .build()
+
+    server.start()
+    server.awaitTermination()
 }
 
 fun responseToLocation(key: SecretKey, nonce: String, ciphertext: String): EpochLocationResponse {
