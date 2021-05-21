@@ -175,7 +175,12 @@ fun main(args: Array<String>) {
                     continue
                 }
 
-                val epochs = request.map { it.toInt() }
+                val epochs: List<Int>
+                try {
+                    epochs = request.map { it.toInt() }
+                } catch (e: NumberFormatException) {
+                    continue
+                }
 
                 val proofs = Database.frontend.getWitnessProofs(
                     WitnessRequest(
@@ -190,7 +195,7 @@ fun main(args: Array<String>) {
                         epochs,
 
                         // Signature
-                        sign(privKey, "${id}${epochs}")
+                        sign(privKey, "${id}${epochs.joinToString { "$it" }}")
                     )
                 )
 

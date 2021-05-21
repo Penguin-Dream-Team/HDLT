@@ -207,43 +207,45 @@ class LocationService(val byzantineLevel: Int) : LocationGrpcKt.LocationCoroutin
     }
 
     override suspend fun getWitnessProofs(request: Report.WitnessProofsRequest): Report.WitnessProofsResponse {
-        try {
-            val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
-            val witnessRequest: WitnessRequest = requestToWitnessRequest(symKey, request.nonce, request.ciphertext)
-
-            val user = witnessRequest.userId
-            val epochs = witnessRequest.epochs
-            val signature = witnessRequest.signature
-
-            val decipheredNonce = Base64.getDecoder().decode(request.nonce)
-            val validNonce = try {
-                Database.nonceDAO.storeUserNonce(decipheredNonce, user)
-            } catch (e: DataAccessException) {
-                false
-            }
-
-            if (validNonce && RequestValidationService.validateSignature(
-                    user,
-                    epochs,
-                    signature
-                )
-            ) {
-                val witnessProofs = LocationReportService.getWitnessProofs(user, epochs)
-
-                if (witnessProofs.isNotEmpty()) {
-                    println("$user request his proofs as Witness")
-
-                    val ack: Boolean
-
-                    // TODO Read Regular
-                }
-            }
-
-        } catch (e: Exception) {
-            // TODO: DEBUG
-            println("SUBMIT ERROR")
-            e.printStackTrace()
+        // Byzantine Level 1: Ignore request
+        if (byzantineLevel >= 1 && Database.random.nextInt(100) < BYZ_PROB_NOT_SEND) {
+            println("Dropping request")
+            return Report.WitnessProofsResponse.getDefaultInstance()
         }
-        throw Status.INVALID_ARGUMENT.asException()
+
+        val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
+        val witnessRequest: WitnessRequest = requestToWitnessRequest(symKey, request.nonce, request.ciphertext)
+
+        val user = witnessRequest.userId
+        val epochs = witnessRequest.epochs
+        val signature = witnessRequest.signature
+
+        val decipheredNonce = Base64.getDecoder().decode(request.nonce)
+        val validNonce = try {
+            Database.nonceDAO.storeUserNonce(decipheredNonce, user)
+        } catch (e: DataAccessException) {
+            false
+        }
+
+        if (!validNonce || !RequestValidationService.validateSignature(user, epochs, signature)) {
+            return Report.WitnessProofsResponse.getDefaultInstance()
+        }
+
+        val witnessProofs = LocationReportService.getWitnessProofs(user, epochs)
+
+        return Report.WitnessProofsResponse.newBuilder().apply {
+            val messageNonce = generateNonce()
+            nonce = Base64.getEncoder().encodeToString(messageNonce)
+
+            ciphertext = symmetricCipher(
+                symKey,
+                Json.encodeToString(
+                    WitnessResponse(
+                        witnessProofs,
+                        sign(Database.key, witnessProofs.joinToString { "$it" })
+                    )
+                ), messageNonce
+            )
+        }.build()
     }
 }

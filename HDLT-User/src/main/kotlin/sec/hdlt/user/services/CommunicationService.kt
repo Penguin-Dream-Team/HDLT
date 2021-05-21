@@ -287,9 +287,10 @@ object CommunicationService {
                                             var curMax = -1
                                             var curKey: LocationResponse = EMPTY_REPORT
                                             responses.values.stream()
-                                                .collect(Collectors.groupingByConcurrent { s ->                                                         (s.orElse(
-                                                    EMPTY_REPORT
-                                                )).toString()
+                                                .collect(Collectors.groupingByConcurrent { s ->
+                                                    (s.orElse(
+                                                        EMPTY_REPORT
+                                                    )).toString()
                                                 })
                                                 .forEach { (_,v) ->
                                                     if (v.size > curMax) {
@@ -336,9 +337,8 @@ object CommunicationService {
         quorum: Int
     ) : Optional<WitnessResponse> {
         val channel = Channel<Unit>(Channel.UNLIMITED)
-        val responses = ConcurrentHashMap<Int, Optional<LocationResponse>>()
-        var maxKey: LocationResponse = EMPTY_REPORT
-
+        val result = mutableListOf<ProofDto>()
+        var numResponses = 0
         val mutex = Mutex()
 
         for (server: Server in servers) {
@@ -349,7 +349,44 @@ object CommunicationService {
                 val serverCert = Database.getServerKey(server.id)
 
                 try {
-                    // TODO READ REGULAR
+                    val response = serverStub.getWitnessProofs(Report.WitnessProofsRequest.newBuilder().apply {
+                        val messageNonce = generateNonce()
+
+                        key =
+                            asymmetricCipher(serverCert, Base64.getEncoder().encodeToString(secret.encoded))
+                        nonce = Base64.getEncoder().encodeToString(messageNonce)
+                        ciphertext = symmetricCipher(secret, Json.encodeToString(request), messageNonce)
+                    }.build())
+
+                    if (response.nonce.equals("") || response.ciphertext.equals("")) {
+                        println("[GetWitnessProofs] Empty response from server")
+                        return@launch
+                    }
+
+                    val witnessResponse = responseToWitnessResponse(secret, response.nonce, response.ciphertext)
+
+                    if (verifySignature(
+                            serverCert,
+                            witnessResponse.proofs.joinToString { "$it" },
+                            request.signature
+                        )
+                    ) {
+                        mutex.withLock {
+                            witnessResponse.proofs.forEach {
+                                if (!result.contains(it)) {
+                                    result.add(it)
+                                }
+                            }
+                        }
+                    } else {
+                        println("[GetWitnessProofs] Response was not sent by server")
+                    }
+
+                    mutex.withLock {
+                        if (++numResponses == quorum) {
+                            channel.offer(Unit)
+                        }
+                    }
 
                 } catch (e: SignatureException) {
                     println("Could not sign message")
@@ -363,13 +400,21 @@ object CommunicationService {
 
         channel.receive()
 
-        // TODO: FIXME
-        return Optional.empty()
+        return if (result.isEmpty()) Optional.empty() else Optional.of(
+            WitnessResponse(
+                result,
+                ""
+            )
+        )
     }
 }
 
 fun responseToAck(key: SecretKey, nonce: String, ciphertext: String): Boolean {
     return Json.decodeFromString(decipherResponse(key, nonce, ciphertext))
+}
+
+fun responseToWitnessResponse(key: SecretKey, nonce: String, ciphertext: String): WitnessResponse {
+    return Json.decodeFromString(symmetricDecipher(key, Base64.getDecoder().decode(nonce), ciphertext))
 }
 
 fun decipherResponse(key: SecretKey, nonce: String, ciphertext: String): String {
