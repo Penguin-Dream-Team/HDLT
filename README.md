@@ -91,10 +91,12 @@ If you want to change the values, you can run the command without the script, bu
 `Main.kt` of the module, and replace the generated keystores in the respective folders (`src/main/resources` of the module).
 Default values are simple just for simple debug, but passwords can be strengthened very easily.
 
-## Full example
+# Full example
+
+## Example One
 
 We will be using 3 LocationServer, 1 MasterServer, 3 Users and 1 HA for this example. The grid will be 4 rows by 4
-columns, and we will have a maximum of 0 byzantine users. You will need 8 different terminal windows to run this setup.
+columns, with a random seed 0 and we will have a maximum of 0 byzantine users and servers. You will need 8 different terminal windows to run this setup.
 
 Let us start by firing up 3 LocationServer. Each server will have its own terminal, and the series of commands will be the following:
 
@@ -104,7 +106,21 @@ gradlew HDLT-LocationServer:run --args="1 -1"
 gradlew HDLT-LocationServer:run --args="2 -1"
 ```
 
-Then we can start the MasterServer in another terminal:
+Now we need to start all the users. Each user will have its own terminal, and the series of commands will be the following:
+
+```bash
+gradlew HDLT-User:run --args="0 localhost 7777 -1"
+gradlew HDLT-User:run --args="1 localhost 7777 -1"
+gradlew HDLT-User:run --args="2 localhost 7777 -1"
+```
+
+We also start the HA:
+
+```bash
+gradlew HDLT-HA:run --args="localhost 7777"
+```
+
+Finally we can start the MasterServer in another terminal:
 
 ```bash
 gradlew HDLT-MasterServer:run
@@ -112,9 +128,31 @@ gradlew HDLT-MasterServer:run
 
 The setup window should be populated to look like this:
 
-![masterViewSetup](images/masterViewSetup.png)
+![masterViewSetup](images/masterViewSetup1.png)
 
-You can press `Finish Setup` but don't start just yet!
+You can press `Finish Setup` and start!
+
+You can now see the users move. Other terminals will also
+log the requests being received and sent. At any point, a user can request the server for proofs of a specific epoch.
+One can do this by just typing the desired epoch in the user prompt. If the user happens to be byzantine, he can try to
+fetch the reports of another user by specifying the other user's id after the epoch.
+
+
+## Example Two
+
+We will be using 4 LocationServer, 1 MasterServer, 3 Users and 1 HA for this example. The grid will be 4 rows by 4
+columns, with a random seed 0 and we will have a maximum of 0 byzantine users and 1 byzantine server. You will need 9 different terminal windows to run this setup.
+
+Let us start by firing up 4 LocationServer. Each server will have its own terminal, and the series of commands will be the following:
+
+```bash
+gradlew HDLT-LocationServer:run --args="0 -1"
+gradlew HDLT-LocationServer:run --args="1 -1"
+gradlew HDLT-LocationServer:run --args="2 -1"
+gradlew HDLT-LocationServer:run --args="3 1"
+```
+
+Remember to place the byzantine in last place (with the higher id), since the MasterServer will treat that server as the byzantine one.
 
 Now we need to start all the users. Each user will have its own terminal, and the series of commands will be the following:
 
@@ -124,13 +162,75 @@ gradlew HDLT-User:run --args="1 localhost 7777 -1"
 gradlew HDLT-User:run --args="2 localhost 7777 -1"
 ```
 
-Finally, we can start the HA:
+We also start the HA:
 
 ```bash
 gradlew HDLT-HA:run --args="localhost 7777"
 ```
 
-When all of this is set up, we can press `Start` on the Master window and see the users move. Their terminals will also
-log the requests being received and sent. At any point, a user can request the server for proofs of a specific epoch.
-One can do this by just typing the desired epoch in the user prompt. If the user happens to be byzantine, he can try to
-fetch the reports of another user by specifying the other user's id after the epoch.
+Finally we can start the MasterServer in another terminal:
+
+```bash
+gradlew HDLT-MasterServer:run
+```
+
+The setup window should be populated to look like this:
+
+![masterViewSetup](images/masterViewSetup2.png)
+
+You can press `Finish Setup` and start!
+
+In this example we can see what happens when a Byzantine server decides to drop a request. The user will receive an Empty Response from the server since the quorum was not met.
+With the random seed provided, this will happen on the Epoch 2. 
+You can check both the user and the server logs to understand what happened.
+
+
+## Example Three
+
+We will be using 4 LocationServer, 1 MasterServer, 4 Users and 1 HA for this example. The grid will be 4 rows by 4
+columns, with a random seed 0 and we will have a maximum of 2 byzantine user and 1 byzantine server. You will need 10 different terminal windows to run this setup.
+
+Let us start by firing up 4 LocationServer. Each server will have its own terminal, and the series of commands will be the following:
+
+```bash
+gradlew HDLT-LocationServer:run --args="0 -1"
+gradlew HDLT-LocationServer:run --args="1 -1"
+gradlew HDLT-LocationServer:run --args="2 -1"
+gradlew HDLT-LocationServer:run --args="3 1"
+```
+
+Remember to place the byzantine in last place (with the higher id), since the MasterServer will treat that server as the byzantine one.
+
+Now we need to start all the users. Each user will have its own terminal, and the series of commands will be the following:
+
+```bash
+gradlew HDLT-User:run --args="0 localhost 7777 -1"
+gradlew HDLT-User:run --args="1 localhost 7777 -1"
+gradlew HDLT-User:run --args="2 localhost 7777 -1"
+gradlew HDLT-User:run --args="3 localhost 7777 1"
+```
+
+Once again, the byzantine must be in the last place (with the higher id), since the MasterServer will treat that user as the byzantine one.
+
+
+We also start the HA:
+
+```bash
+gradlew HDLT-HA:run --args="localhost 7777"
+```
+
+Finally we can start the MasterServer in another terminal:
+
+```bash
+gradlew HDLT-MasterServer:run
+```
+
+The setup window should be populated to look like this:
+
+![masterViewSetup](images/masterViewSetup3.png)
+
+You can press `Finish Setup` and start!
+
+In this example we can see what happens when a Byzantine user decides to tampper a request. The user will receive an Invalid Request detected by the servers since the contents of the report were changed.
+With the random seed provided, this will happen on the 29. 
+You can check both the user and the server logs to understand what happened.
