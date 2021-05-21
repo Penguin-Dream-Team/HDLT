@@ -145,7 +145,7 @@ object CommunicationService {
                                 } else if (message == INVALID_REQ) {
                                     println("[GetLocationReport] Invalid request")
                                     mutex.withLock {
-                                        responses[server.id] = Optional.empty(EMPTY_REPORT)
+                                        responses[server.id] = Optional.of(EMPTY_REPORT)
 
                                         // Group responses
                                         var curMax = -1
