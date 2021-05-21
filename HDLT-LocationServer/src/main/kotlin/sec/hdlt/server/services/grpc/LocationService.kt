@@ -234,16 +234,6 @@ class LocationService(val byzantineLevel: Int) : LocationGrpcKt.LocationCoroutin
             return Report.WitnessProofsResponse.getDefaultInstance()
         }
 
-        val validNonce = try {
-            Database.nonceDAO.storeUserNonce(decipheredNonce, user)
-        } catch (e: DataAccessException) {
-            false
-        }
-
-        if (!validNonce || !RequestValidationService.validateSignature(user, epochs, signature)) {
-            return Report.WitnessProofsResponse.getDefaultInstance()
-        }
-
         val witnessProofs = LocationReportService.getWitnessProofs(user, epochs)
 
         return Report.WitnessProofsResponse.newBuilder().apply {
@@ -255,7 +245,7 @@ class LocationService(val byzantineLevel: Int) : LocationGrpcKt.LocationCoroutin
                 Json.encodeToString(
                     WitnessResponse(
                         witnessProofs,
-                        sign(Database.key, witnessProofs.joinToString { "$it" })
+                        sign(Database.key, witnessProofs.joinToString { "${it.epoch}" })
                     )
                 ), messageNonce
             )

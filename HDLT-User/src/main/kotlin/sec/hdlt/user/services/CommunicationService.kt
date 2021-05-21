@@ -371,14 +371,14 @@ object CommunicationService {
 
                     if (verifySignature(
                             serverCert,
-                            witnessResponse.proofs.joinToString { "$it" },
-                            request.signature
+                            witnessResponse.proofs.joinToString { "${it.epoch}" },
+                            witnessResponse.signature
                         )
                     ) {
                         mutex.withLock {
-                            witnessResponse.proofs.forEach {
-                                if (!result.contains(it)) {
-                                    result.add(it)
+                            witnessResponse.proofs.forEach { proof ->
+                                if (!result.contains(proof) && validateSignature(proof.requester, proof.prover, proof.epoch, proof.signature)) {
+                                    result.add(proof)
                                 }
                             }
                         }
@@ -423,4 +423,29 @@ fun responseToWitnessResponse(key: SecretKey, nonce: String, ciphertext: String)
 fun decipherResponse(key: SecretKey, nonce: String, ciphertext: String): String {
     val decodedNonce: ByteArray = Base64.getDecoder().decode(nonce)
     return symmetricDecipher(key, decodedNonce, ciphertext)
+}
+
+fun validateSignature(
+    user: Int,
+    prover: Int,
+    epoch: Int,
+    sig: String
+): Boolean {
+    return validateSignatureImpl(prover, sig, "${user}${prover}${epoch}", user)
+}
+
+private fun validateSignatureImpl(user: Int, sig: String, format: String, requester: Int): Boolean {
+    return try {
+        verifySignature(Database.keyStore.getCertificate("cert_hdlt_user_$user"), format, sig)
+    } catch (e: SignatureException) {
+        println("Invalid signature detected for user $requester")
+        false
+
+    } catch (e: IllegalArgumentException) {
+        println("Invalid base64 detected for user $requester")
+        false
+    } catch (e: NullPointerException) {
+        println("Invalid user with id $user")
+        false
+    }
 }

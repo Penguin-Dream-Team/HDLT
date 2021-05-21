@@ -81,7 +81,7 @@ fun hash(input: MutableList<ByteArray>, nonce: Long): ByteArray {
     input[input.size - 1] = ByteBuffer.allocate(8).putLong(nonce).array()
 
     val digest = MessageDigest
-        .getInstance("SHA256")
+        .getInstance("SHA-256")
 
     input.forEach {
         digest.update(it)

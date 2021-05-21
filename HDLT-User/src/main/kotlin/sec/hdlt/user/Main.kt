@@ -202,7 +202,7 @@ fun main(args: Array<String>) {
                 if (proofs.isEmpty) {
                     println("NO PROOFS AS WITNESS FOUND FOR YOUR EPOCHS")
                 } else {
-                    println("GOT PROOFS AS WITNESS:\n$proofs")
+                    println("GOT PROOFS AS WITNESS:\n${proofs.get()}")
                 }
             }
             else {
