@@ -37,8 +37,14 @@ will see a window that will help to set up the system. Here you can select the a
 rows), f and f' parameters. To run each of these modules, use the following commands:
 
 ```bash
-gradlew HDLT-LocationServer:run
 gradlew HDLT-MasterServer:run
+```
+
+After setting up the master, you need to fire up the servers. There should be as many servers as you defined in the master.
+To run a server use the following command:
+
+```bash
+gradlew HDLT-LocationServer:run --args="<id> <byzantineLevel>"
 ```
 
 After setting up the master, you need to fire up the users. There should be as many users as you defined in the master.
@@ -87,16 +93,18 @@ Default values are simple just for simple debug, but passwords can be strengthen
 
 ## Full example
 
-We will be using 1 LocationServer, 1 MasterServer, 4 Users and 1 HA for this example. The grid will be 5 rows by 5
-columns, and we will have a maximum of 2 byzantine users. You will need 7 different terminal windows to run this setup.
+We will be using 3 LocationServer, 1 MasterServer, 3 Users and 1 HA for this example. The grid will be 4 rows by 4
+columns, and we will have a maximum of 0 byzantine users. You will need 8 different terminal windows to run this setup.
 
-Let us start by firing up the LocationServer in terminal 1.
+Let us start by firing up 3 LocationServer. Each server will have its own terminal, and the series of commands will be the following:
 
 ```bash
-gradlew HDLT-LocationServer:run
+gradlew HDLT-LocationServer:run --args="0 -1"
+gradlew HDLT-LocationServer:run --args="1 -1"
+gradlew HDLT-LocationServer:run --args="2 -1"
 ```
 
-Then we can start the MasterServer in terminal 2:
+Then we can start the MasterServer in another terminal:
 
 ```bash
 gradlew HDLT-MasterServer:run
@@ -107,17 +115,13 @@ The setup window should be populated to look like this:
 
 You can press `Finish Setup` but don't start just yet!
 
-Now we need to start all the users. We're going to be using 2 byzantine users, so those are going to be the last ones we
-initialize. Each user will have its own terminal, and the series of commands will be the following:
+Now we need to start all the users. Each user will have its own terminal, and the series of commands will be the following:
 
 ```bash
 gradlew HDLT-User:run --args="0 localhost 7777 -1"
 gradlew HDLT-User:run --args="1 localhost 7777 -1"
-gradlew HDLT-User:run --args="2 localhost 7777 3"
-gradlew HDLT-User:run --args="3 localhost 7777 5"
+gradlew HDLT-User:run --args="2 localhost 7777 -1"
 ```
-
-This means user 2 and 3 will be byzantine and can have incorrect behaviour.
 
 Finally, we can start the HA:
 
@@ -129,11 +133,3 @@ When all of this is set up, we can press `Start` on the Master window and see th
 log the requests being received and sent. At any point, a user can request the server for proofs of a specific epoch.
 One can do this by just typing the desired epoch in the user prompt. If the user happens to be byzantine, he can try to
 fetch the reports of another user by specifying the other user's id after the epoch.
-
-```bash
-// Assuming these commands run on User 0
-// Normal execution - User 0 requests own report for epoch 5
-5
-// Byzantine execution - User 0 requests report of user 3 for epoch 5 for user
-5 3
-```
