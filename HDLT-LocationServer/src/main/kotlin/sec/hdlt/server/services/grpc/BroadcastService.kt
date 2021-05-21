@@ -38,8 +38,6 @@ class BroadcastService : BroadcastGrpcKt.BroadcastCoroutineImplBase() {
         val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
         val report: LocationReport = requestToLocationReport(symKey, request.nonce, request.ciphertext)
 
-        // TODO: check nonce -> Create table, check if already exists
-
         val decipheredNonce = Base64.getDecoder().decode(request.nonce)
         try {
             Database.nonceDAO.storeServerNonce(decipheredNonce, request.serverId)
@@ -216,7 +214,59 @@ suspend fun broadcast(request: LocationReport): Optional<LocationReport> {
         // Activate timeout to obtain quorum
         val job = GlobalScope.launch {
             delay(BROADCAST_DELAY)
-            channel.offer(Optional.empty())
+            BROADCAST_LOCK.withLock {
+                val epochListener: ConcurrentHashMap<Int, Channel<Optional<LocationReport>>> =
+                    if (BROADCAST_CHANNELS.containsKey(request.epoch)) {
+                        BROADCAST_CHANNELS[request.epoch]!!
+                    } else {
+                        val map = ConcurrentHashMap<Int, Channel<Optional<LocationReport>>>()
+                        BROADCAST_CHANNELS[request.epoch] = map
+                        map
+                    }
+
+                epochListener[request.id] = channel
+
+                val epochResponses: ConcurrentHashMap<Int, MutableList<BroadcastInfo>> =
+                    if (BROADCAST_RESPONSES.containsKey(request.epoch)) {
+                        BROADCAST_RESPONSES[request.epoch]!!
+                    } else {
+                        val map = ConcurrentHashMap<Int, MutableList<BroadcastInfo>>()
+                        BROADCAST_RESPONSES[request.epoch] = map
+                        map
+                    }
+
+                val responses: MutableList<BroadcastInfo> = if (epochResponses.containsKey(request.id)) {
+                    epochResponses[request.id]!!
+                } else {
+                    val list = mutableListOf<BroadcastInfo>()
+                    epochResponses[request.id] = list
+                    list
+                }
+
+                if (responses.isNotEmpty()) {
+                    // Group responses
+                    var curMax = -1
+                    var curKey = EMPTY_REPORT
+                    val remaining = Database.numServers - responses.size
+                    responses.stream()
+                        .collect(Collectors.groupingBy { s -> s.toString() })
+                        .forEach { (_, v) ->
+                            if (v.size > curMax) {
+                                curMax = v.size
+                                curKey = v[0].response
+                            }
+                        }
+
+                    if (curMax > Database.quorum) {
+                        channel.offer(Optional.of(curKey))
+                    } else if (remaining + curMax < Database.quorum) {
+                        // Check if quorum is unreachable
+                        channel.offer(Optional.empty())
+                    }
+                }
+
+                channel.offer(Optional.empty())
+            }
         }
 
         // Wait for response
