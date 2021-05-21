@@ -111,6 +111,7 @@ gradlew HDLT-MasterServer:run
 ```
 
 The setup window should be populated to look like this:
+
 ![masterViewSetup](images/masterViewSetup.png)
 
 You can press `Finish Setup` but don't start just yet!
