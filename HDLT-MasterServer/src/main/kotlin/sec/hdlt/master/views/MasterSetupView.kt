@@ -102,8 +102,8 @@ class MasterSetupView : View("MasterView | Setup") {
                     textfield(model.byzantineServers) { intOnly() }.validator {
                         if (it.isNullOrBlank() || model.byzantineServers < 0) {
                             error("Byzantine Servers cannot be negative")
-                        } else if (model.byzantineServers >= (model.serverCount - 1) / 2 && model.byzantineServers.value != 0) {
-                            error("Byzantine Servers has to be less than ${model.serverCount.value} - 1 / 2 (${(model.serverCount.value - 1) / 2})")
+                        } else if (model.byzantineServers >= (model.serverCount - 1) / 3 && model.byzantineServers.value != 0) {
+                            error("Byzantine Servers has to be less than ${model.serverCount.value} - 1 / 3 (${(model.serverCount.value - 1) / 3})")
                         } else {
                             null
                         }
