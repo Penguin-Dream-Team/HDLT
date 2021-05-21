@@ -34,3 +34,7 @@ data class ProofOfWork(
         }
     }
 }
+
+fun Report.ProofOfWork.toProofOfWork(): ProofOfWork {
+    return ProofOfWork(data, hash, nonce)
+}

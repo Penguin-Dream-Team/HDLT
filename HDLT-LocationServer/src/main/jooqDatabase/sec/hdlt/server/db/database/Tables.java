@@ -4,6 +4,7 @@
 package sec.hdlt.server.db.database;
 
 
+import sec.hdlt.server.db.database.tables.BroadcastNonces;
 import sec.hdlt.server.db.database.tables.HaNonces;
 import sec.hdlt.server.db.database.tables.Nonces;
 import sec.hdlt.server.db.database.tables.Proofs;
@@ -17,6 +18,11 @@ import sec.hdlt.server.db.database.tables.UserRequests;
  */
 @SuppressWarnings({ "all", "unchecked", "rawtypes" })
 public class Tables {
+
+    /**
+     * The table <code>broadcast_nonces</code>.
+     */
+    public static final BroadcastNonces BROADCAST_NONCES = BroadcastNonces.BROADCAST_NONCES;
 
     /**
      * The table <code>ha_nonces</code>.

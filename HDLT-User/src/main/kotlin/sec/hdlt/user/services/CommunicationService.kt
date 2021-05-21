@@ -16,6 +16,8 @@ import kotlinx.serialization.json.Json
 import sec.hdlt.protos.server.LocationGrpcKt
 import sec.hdlt.protos.server.Report
 import sec.hdlt.user.*
+import sec.hdlt.user.antispam.createProofOfWorkRequest
+import sec.hdlt.user.antispam.proofOfWork
 import sec.hdlt.user.domain.Coordinates
 import sec.hdlt.user.domain.Database
 import sec.hdlt.user.domain.Server
@@ -36,8 +38,9 @@ const val LEADING_ZEROS = 5
 
 object CommunicationService {
 
-    suspend fun proofOfWork(message: String) {
-
+    private fun prepareProofOfWork(message: String): Report.ProofOfWork {
+        val request = createProofOfWorkRequest(message)
+        return proofOfWork(request)?.toGrpcProof() ?: Report.ProofOfWork.getDefaultInstance()
     }
 
     suspend fun submitReport(report: ReportDto, servers: List<Server>, quorum: Int): Boolean {
@@ -292,11 +295,11 @@ object CommunicationService {
                                                         EMPTY_REPORT
                                                     )).toString()
                                                 })
-                                                .forEach { (_,v) ->
+                                                .forEach { (_, v) ->
                                                     if (v.size > curMax) {
                                                         curMax = v.size
-                                                    curKey = v[0].get()
-                                                }
+                                                        curKey = v[0].get()
+                                                    }
                                                 }
 
                                             if (curMax > quorum) {
@@ -335,7 +338,7 @@ object CommunicationService {
         request: WitnessRequest,
         servers: MutableList<Server>,
         quorum: Int
-    ) : Optional<WitnessResponse> {
+    ): Optional<WitnessResponse> {
         val channel = Channel<Unit>(Channel.UNLIMITED)
         val result = mutableListOf<ProofDto>()
         var numResponses = 0
@@ -356,6 +359,7 @@ object CommunicationService {
                             asymmetricCipher(serverCert, Base64.getEncoder().encodeToString(secret.encoded))
                         nonce = Base64.getEncoder().encodeToString(messageNonce)
                         ciphertext = symmetricCipher(secret, Json.encodeToString(request), messageNonce)
+                        proofOfWork = prepareProofOfWork(nonce)
                     }.build())
 
                     if (response.nonce.equals("") || response.ciphertext.equals("")) {
@@ -387,7 +391,6 @@ object CommunicationService {
                             channel.offer(Unit)
                         }
                     }
-
                 } catch (e: SignatureException) {
                     println("Could not sign message")
                     return@launch

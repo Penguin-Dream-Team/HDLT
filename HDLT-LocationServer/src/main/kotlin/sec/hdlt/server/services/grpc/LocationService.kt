@@ -13,6 +13,8 @@ import org.jooq.exception.DataAccessException
 import sec.hdlt.protos.server.LocationGrpcKt
 import sec.hdlt.protos.server.Report
 import sec.hdlt.server.*
+import sec.hdlt.server.antispam.toProofOfWork
+import sec.hdlt.server.antispam.verifyProofOfWork
 import sec.hdlt.server.domain.*
 import sec.hdlt.server.services.LocationReportService
 import sec.hdlt.server.services.RequestValidationService
@@ -212,7 +214,6 @@ class LocationService(val byzantineLevel: Int) : LocationGrpcKt.LocationCoroutin
             println("Dropping request")
             return Report.WitnessProofsResponse.getDefaultInstance()
         }
-
         val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
         val witnessRequest: WitnessRequest = requestToWitnessRequest(symKey, request.nonce, request.ciphertext)
 
@@ -220,7 +221,19 @@ class LocationService(val byzantineLevel: Int) : LocationGrpcKt.LocationCoroutin
         val epochs = witnessRequest.epochs
         val signature = witnessRequest.signature
 
+        if (!verifyProofOfWork(request.proofOfWork.toProofOfWork())) {
+            println("[Anti-Spam] Work submitted not valid")
+            throw Status.INVALID_ARGUMENT.asException()
+        }
+
         val decipheredNonce = Base64.getDecoder().decode(request.nonce)
+        try {
+            Database.nonceDAO.storeUserNonce(decipheredNonce, user)
+        } catch (e: DataAccessException) {
+            println("[WitnessProofs] Received invalid nonce")
+            throw Status.INVALID_ARGUMENT.asException()
+        }
+
         val validNonce = try {
             Database.nonceDAO.storeUserNonce(decipheredNonce, user)
         } catch (e: DataAccessException) {
