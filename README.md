@@ -188,14 +188,14 @@ You can check both the user and the server logs to understand what happened.
 ## Example Three
 
 We will be using 4 LocationServer, 1 MasterServer, 4 Users and 1 HA for this example. The grid will be 4 rows by 4
-columns, with a random seed 0 and we will have a maximum of 2 byzantine user and 1 byzantine server. You will need 10 different terminal windows to run this setup.
+columns, with a random seed 0 and we will have a maximum of 2 byzantine users and 1 byzantine server. You will need 10 different terminal windows to run this setup.
 
 Let us start by firing up 4 LocationServer. Each server will have its own terminal, and the series of commands will be the following:
 
 ```bash
 gradlew HDLT-LocationServer:run --args="0 -1"
 gradlew HDLT-LocationServer:run --args="1 -1"
-gradlew HDLT-LocationServer:run --args="2 -1"
+gradlew HDLT-LocationServer:run --args="2 1"
 gradlew HDLT-LocationServer:run --args="3 1"
 ```
 
