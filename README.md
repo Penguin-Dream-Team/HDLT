@@ -195,7 +195,7 @@ Let us start by firing up 4 LocationServer. Each server will have its own termin
 ```bash
 gradlew HDLT-LocationServer:run --args="0 -1"
 gradlew HDLT-LocationServer:run --args="1 -1"
-gradlew HDLT-LocationServer:run --args="2 1"
+gradlew HDLT-LocationServer:run --args="2 -1"
 gradlew HDLT-LocationServer:run --args="3 1"
 ```
 
@@ -206,7 +206,7 @@ Now we need to start all the users. Each user will have its own terminal, and th
 ```bash
 gradlew HDLT-User:run --args="0 localhost 7777 -1"
 gradlew HDLT-User:run --args="1 localhost 7777 -1"
-gradlew HDLT-User:run --args="2 localhost 7777 -1"
+gradlew HDLT-User:run --args="2 localhost 7777 1"
 gradlew HDLT-User:run --args="3 localhost 7777 1"
 ```
 
