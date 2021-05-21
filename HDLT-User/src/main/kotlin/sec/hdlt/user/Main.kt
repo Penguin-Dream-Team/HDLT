@@ -185,11 +185,7 @@ fun main(args: Array<String>) {
                 val proofs = Database.frontend.getWitnessProofs(
                     WitnessRequest(
                         // User Id
-                        if (request.size == 2) {
-                            request[1].toInt()
-                        } else {
-                            id
-                        },
+                        id,
 
                         // Epochs
                         epochs,

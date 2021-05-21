@@ -1,5 +1,6 @@
 package sec.hdlt.ha
 
+import java.nio.ByteBuffer
 import java.security.*
 import java.security.cert.Certificate
 import java.util.*
@@ -70,4 +71,18 @@ fun verifySignature(key: Certificate, format: String, signature: String): Boolea
     sig.update(format.toByteArray())
 
     return sig.verify(Base64.getDecoder().decode(signature))
+}
+
+fun hash(input: MutableList<ByteArray>, nonce: Long): ByteArray {
+    // add nonce
+    input[input.size - 1] = ByteBuffer.allocate(8).putLong(nonce).array()
+
+    val digest = MessageDigest
+        .getInstance("SHA-256")
+
+    input.forEach {
+        digest.update(it)
+    }
+
+    return digest.digest()
 }

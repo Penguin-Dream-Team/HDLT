@@ -13,6 +13,7 @@ service Location {
 service HA {
   rpc UserLocationReport (stream UserLocationReportRequest) returns (stream UserLocationReportResponse);
   rpc UsersAtCoordinates (UsersAtCoordinatesRequest) returns (UsersAtCoordinatesResponse);
+  rpc GetWitnessProofs (WitnessProofsRequest) returns (WitnessProofsResponse);
 }
 
 message ReportRequest {

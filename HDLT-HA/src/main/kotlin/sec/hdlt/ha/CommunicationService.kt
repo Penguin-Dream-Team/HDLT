@@ -14,7 +14,10 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import sec.hdlt.ha.data.*
 import sec.hdlt.protos.server.HAGrpcKt
+import sec.hdlt.protos.server.LocationGrpcKt
 import sec.hdlt.protos.server.Report
+import sec.hdlt.ha.antispam.createProofOfWorkRequest
+import sec.hdlt.ha.antispam.proofOfWork
 import java.security.SignatureException
 import java.security.cert.Certificate
 import java.util.*
@@ -31,8 +34,9 @@ val EMPTY_LOCATION = EpochLocationResponse(mutableListOf(), Coordinates(-1, -1),
 
 object CommunicationService {
 
-    suspend fun proofOfWork(message: String) {
-
+    private fun prepareProofOfWork(message: String): Report.ProofOfWork {
+        val request = createProofOfWorkRequest(message)
+        return proofOfWork(request)?.toGrpcProof() ?: Report.ProofOfWork.getDefaultInstance()
     }
 
     suspend fun getLocationReport(
@@ -327,6 +331,83 @@ object CommunicationService {
             )
         )
     }
+
+    suspend fun getWitnessProofs(
+        request: WitnessRequest,
+        servers: MutableList<Server>,
+        quorum: Int
+    ): Optional<WitnessResponse> {
+        val channel = Channel<Unit>(Channel.UNLIMITED)
+        val result = mutableListOf<ProofDto>()
+        var numResponses = 0
+        val mutex = Mutex()
+
+        for (server: Server in servers) {
+            GlobalScope.launch {
+                val serverStub = HAGrpcKt.HACoroutineStub(server.channel)
+
+                val secret = generateKey()
+                val serverCert = Database.getServerKey(server.id)
+
+                try {
+                    val response = serverStub.getWitnessProofs(Report.WitnessProofsRequest.newBuilder().apply {
+                        val messageNonce = generateNonce()
+
+                        key =
+                            asymmetricCipher(serverCert, Base64.getEncoder().encodeToString(secret.encoded))
+                        nonce = Base64.getEncoder().encodeToString(messageNonce)
+                        ciphertext = symmetricCipher(secret, Json.encodeToString(request), messageNonce)
+                        proofOfWork = prepareProofOfWork(nonce)
+                    }.build())
+
+                    if (response.nonce.equals("") || response.ciphertext.equals("")) {
+                        println("[GetWitnessProofs] Empty response from server")
+                        return@launch
+                    }
+
+                    val witnessResponse = responseToWitnessResponse(secret, response.nonce, response.ciphertext)
+
+                    if (verifySignature(
+                            serverCert,
+                            witnessResponse.proofs.joinToString { "${it.epoch}" },
+                            witnessResponse.signature
+                        )
+                    ) {
+                        mutex.withLock {
+                            witnessResponse.proofs.forEach { proof ->
+                                if (!result.contains(proof) && validateSignature(proof.requester, proof.prover, proof.epoch, proof.signature)) {
+                                    result.add(proof)
+                                }
+                            }
+                        }
+                    } else {
+                        println("[GetWitnessProofs] Response was not sent by server")
+                    }
+
+                    mutex.withLock {
+                        if (++numResponses == quorum) {
+                            channel.offer(Unit)
+                        }
+                    }
+                } catch (e: SignatureException) {
+                    println("Could not sign message")
+                    return@launch
+                } catch (e: StatusException) {
+                    println("[GetWitnessProofs] Error connecting to server")
+                    return@launch
+                }
+            }
+        }
+
+        channel.receive()
+
+        return if (result.isEmpty()) Optional.empty() else Optional.of(
+            WitnessResponse(
+                result,
+                ""
+            )
+        )
+    }
 }
 
 fun decipherResponse(key: SecretKey, nonce: String, ciphertext: String): String {
@@ -337,6 +418,10 @@ fun decipherResponse(key: SecretKey, nonce: String, ciphertext: String): String 
 fun responseToEpochLocation(key: SecretKey, nonce: String, ciphertext: String): EpochLocationResponse {
     val decodedNonce: ByteArray = Base64.getDecoder().decode(nonce)
     return Json.decodeFromString(symmetricDecipher(key, decodedNonce, ciphertext))
+}
+
+fun responseToWitnessResponse(key: SecretKey, nonce: String, ciphertext: String): WitnessResponse {
+    return Json.decodeFromString(symmetricDecipher(key, Base64.getDecoder().decode(nonce), ciphertext))
 }
 
 fun verifyEpochLocationReport(epoch: Int, coords: Coordinates, report: sec.hdlt.ha.data.Report): Boolean {
@@ -354,6 +439,31 @@ fun verifyProof(user: Int, proof: Proof): Boolean {
     } catch (e: SignatureException) {
         false
     } catch (e: NullPointerException) {
+        false
+    }
+}
+
+fun validateSignature(
+    user: Int,
+    prover: Int,
+    epoch: Int,
+    sig: String
+): Boolean {
+    return validateSignatureImpl(prover, sig, "${user}${prover}${epoch}", user)
+}
+
+private fun validateSignatureImpl(user: Int, sig: String, format: String, requester: Int): Boolean {
+    return try {
+        verifySignature(Database.keyStore.getCertificate("cert_hdlt_user_$user"), format, sig)
+    } catch (e: SignatureException) {
+        println("Invalid signature detected for user $requester")
+        false
+
+    } catch (e: IllegalArgumentException) {
+        println("Invalid base64 detected for user $requester")
+        false
+    } catch (e: NullPointerException) {
+        println("Invalid user with id $user")
         false
     }
 }

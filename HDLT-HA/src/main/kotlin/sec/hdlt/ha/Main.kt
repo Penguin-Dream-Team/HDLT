@@ -79,7 +79,8 @@ fun main(args: Array<String>) {
         while (true) {
             println("1 - Request report of a user")
             println("2 - Request for one users at specific location")
-            println("3 - Exit")
+            println("3 - Request witness proofs of a user")
+            println("4 - Exit")
             print(">> ")
             val option: Int
 
@@ -151,7 +152,52 @@ fun main(args: Array<String>) {
                 val users = Database.frontend.usersAtLocation(EpochLocationRequest(coords, epoch, sign(Database.key, "$coords$epoch")))
 
                 println(if (users.isEmpty) "No users at $coords in epoch $epoch" else "Users found: ${users.get()}")
+
+                // Ask for user witness proofs
             } else if (option == 3) {
+                println("Asking for witness proofs of a user")
+                println("Write request in the form `<user id> <epoch>+`")
+                val request: List<String>
+
+                try {
+                    request = readLine()!!.split(" ")
+                } catch (e: NumberFormatException) {
+                    continue
+                }
+
+                if (request.size < 2) {
+                    println("Invalid syntax")
+                    continue
+                }
+
+                val user: Int
+                val epochs: List<Int>
+                try {
+                    user = request[0].toInt()
+                    epochs = request.subList(1, request.size).map { it.toInt() }
+                } catch (e: NumberFormatException) {
+                    continue
+                }
+
+                val proofs = Database.frontend.getWitnessProofs(
+                    WitnessRequest(
+                        // User Id
+                        user,
+
+                        // Epochs
+                        epochs,
+
+                        // Signature
+                        sign(privKey, "${user}${epochs.joinToString { "$it" }}")
+                    )
+                )
+
+                if (proofs.isEmpty) {
+                    println("NO PROOFS AS WITNESS FOUND FOR USER $user")
+                } else {
+                    println("GOT USER $user PROOFS AS WITNESS:\n${proofs.get()}")
+                }
+            } else if (option == 4) {
                 break
             } else {
                 println("Unknown option")

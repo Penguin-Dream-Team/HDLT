@@ -12,6 +12,8 @@ import org.jooq.exception.DataAccessException
 import sec.hdlt.protos.server.HAGrpcKt
 import sec.hdlt.protos.server.Report
 import sec.hdlt.server.*
+import sec.hdlt.server.antispam.toProofOfWork
+import sec.hdlt.server.antispam.verifyProofOfWork
 import sec.hdlt.server.domain.*
 import sec.hdlt.server.services.LocationReportService
 import sec.hdlt.server.services.RequestValidationService
@@ -170,6 +172,54 @@ class HAService(private val byzantineLevel: Int) : HAGrpcKt.HACoroutineImplBase(
                         coordinates,
                         epoch,
                         sign(Database.key, "$coordinates$epoch${users.joinToString { "$it" }}")
+                    )
+                ), messageNonce
+            )
+        }.build()
+    }
+
+    override suspend fun getWitnessProofs(request: Report.WitnessProofsRequest): Report.WitnessProofsResponse {
+        // Byzantine Level 1: Ignore request
+        if (byzantineLevel >= 1 && Database.random.nextInt(100) < BYZ_PROB_NOT_SEND) {
+            println("Dropping request")
+            return Report.WitnessProofsResponse.getDefaultInstance()
+        }
+        val symKey: SecretKey = asymmetricDecipher(Database.key, request.key)
+        val witnessRequest: WitnessRequest = requestToWitnessRequest(symKey, request.nonce, request.ciphertext)
+
+        val user = witnessRequest.userId
+        val epochs = witnessRequest.epochs
+        val signature = witnessRequest.signature
+
+        if (!verifyProofOfWork(request.proofOfWork.toProofOfWork())) {
+            println("[Anti-Spam] Work submitted not valid")
+            return Report.WitnessProofsResponse.getDefaultInstance()
+        }
+
+        val decipheredNonce = Base64.getDecoder().decode(request.nonce)
+        try {
+            Database.nonceDAO.storeUserNonce(decipheredNonce, user)
+        } catch (e: DataAccessException) {
+            println("[WitnessProofs] Received invalid nonce")
+            return Report.WitnessProofsResponse.getDefaultInstance()
+        }
+
+        if (!RequestValidationService.validateHASignature(user, epochs, signature)) {
+            return Report.WitnessProofsResponse.getDefaultInstance()
+        }
+
+        val witnessProofs = LocationReportService.getWitnessProofs(user, epochs)
+
+        return Report.WitnessProofsResponse.newBuilder().apply {
+            val messageNonce = generateNonce()
+            nonce = Base64.getEncoder().encodeToString(messageNonce)
+
+            ciphertext = symmetricCipher(
+                symKey,
+                Json.encodeToString(
+                    WitnessResponse(
+                        witnessProofs,
+                        sign(Database.key, witnessProofs.joinToString { "${it.epoch}" })
                     )
                 ), messageNonce
             )

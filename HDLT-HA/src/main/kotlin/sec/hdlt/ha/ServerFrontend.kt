@@ -32,4 +32,8 @@ class ServerFrontend(host: String, port: Int, val num: Int, private val quorum: 
     suspend fun usersAtLocation(request: EpochLocationRequest): Optional<EpochLocationResponse> {
         return CommunicationService.usersAtCoordinates(request, servers, quorum)
     }
+
+    suspend fun getWitnessProofs(request: WitnessRequest): Optional<WitnessResponse> {
+        return CommunicationService.getWitnessProofs(request, servers, quorum)
+    }
 }

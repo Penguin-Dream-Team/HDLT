@@ -1,10 +1,12 @@
 package sec.hdlt.ha.data
 
 import sec.hdlt.ha.CERT_SERVER_PREFIX
+import sec.hdlt.ha.CommunicationService
 import sec.hdlt.ha.ServerFrontend
 import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.cert.Certificate
+import java.util.*
 
 /**
  *  Class to hold global data about the system

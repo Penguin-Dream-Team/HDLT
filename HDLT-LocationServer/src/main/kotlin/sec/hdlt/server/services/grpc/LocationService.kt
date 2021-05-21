@@ -234,6 +234,10 @@ class LocationService(val byzantineLevel: Int) : LocationGrpcKt.LocationCoroutin
             return Report.WitnessProofsResponse.getDefaultInstance()
         }
 
+        if (!RequestValidationService.validateSignature(user, epochs, signature)) {
+            return Report.WitnessProofsResponse.getDefaultInstance()
+        }
+
         val witnessProofs = LocationReportService.getWitnessProofs(user, epochs)
 
         return Report.WitnessProofsResponse.newBuilder().apply {

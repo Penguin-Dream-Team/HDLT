@@ -58,6 +58,14 @@ class RequestValidationService {
             return validateHASignatureImpl("$coords$epoch", sig)
         }
 
+        fun validateHASignature(
+            user: Int,
+            epochs: List<Int>,
+            sig: String
+        ): Boolean {
+            return validateHASignatureImpl("$user${epochs.joinToString { it.toString() }}", sig)
+        }
+
         fun validateSignature(
             user: Int,
             epoch: Int,
