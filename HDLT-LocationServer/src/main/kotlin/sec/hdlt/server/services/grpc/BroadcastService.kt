@@ -1,6 +1,7 @@
 package sec.hdlt.server.services.grpc
 
 import io.grpc.ManagedChannelBuilder
+import io.grpc.Status
 import io.grpc.StatusException
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.Channel
@@ -10,6 +11,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.jooq.exception.DataAccessException
 import sec.hdlt.protos.server.BroadcastGrpcKt
 import sec.hdlt.protos.server.Server
 import sec.hdlt.server.*
@@ -37,6 +39,14 @@ class BroadcastService : BroadcastGrpcKt.BroadcastCoroutineImplBase() {
         val report: LocationReport = requestToLocationReport(symKey, request.nonce, request.ciphertext)
 
         // TODO: check nonce -> Create table, check if already exists
+
+        val decipheredNonce = Base64.getDecoder().decode(request.nonce)
+        try {
+            Database.nonceDAO.storeServerNonce(decipheredNonce, request.serverId)
+        } catch (e: DataAccessException) {
+            println("[Broadcast] Received duplicate nonce in request")
+            throw Status.INVALID_ARGUMENT.asException()
+        }
 
         // Check request signature
         try {

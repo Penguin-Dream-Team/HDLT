@@ -11,6 +11,7 @@ import org.jooq.Catalog;
 import org.jooq.Table;
 import org.jooq.impl.SchemaImpl;
 
+import sec.hdlt.server.db.database.tables.BroadcastNonces;
 import sec.hdlt.server.db.database.tables.HaNonces;
 import sec.hdlt.server.db.database.tables.Nonces;
 import sec.hdlt.server.db.database.tables.Proofs;
@@ -31,6 +32,11 @@ public class DefaultSchema extends SchemaImpl {
      * The reference instance of <code>DEFAULT_SCHEMA</code>
      */
     public static final DefaultSchema DEFAULT_SCHEMA = new DefaultSchema();
+
+    /**
+     * The table <code>broadcast_nonces</code>.
+     */
+    public final BroadcastNonces BROADCAST_NONCES = BroadcastNonces.BROADCAST_NONCES;
 
     /**
      * The table <code>ha_nonces</code>.
@@ -78,6 +84,7 @@ public class DefaultSchema extends SchemaImpl {
     @Override
     public final List<Table<?>> getTables() {
         return Arrays.<Table<?>>asList(
+            BroadcastNonces.BROADCAST_NONCES,
             HaNonces.HA_NONCES,
             Nonces.NONCES,
             Proofs.PROOFS,
